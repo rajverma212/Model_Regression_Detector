@@ -1,0 +1,122 @@
+name: Evaluation Gate
+
+# Deployment-safety gate. When prompts, datasets, features, or config change, run
+# the evaluation suite and compare the candidate run against the active baseline.
+# A blocking (CRITICAL) regression fails this job — wire it as a required status
+# check to block the merge. This workflow only orchestrates the existing CLI; all
+# logic lives in `mrds` (no duplicated logic here).
+
+on:
+  pull_request:
+    paths:
+      - "prompts/**"
+      - "datasets/**"
+      - "src/mrds/features/**"
+      - "config/**"
+  push:
+    branches: [main]
+    paths:
+      - "prompts/**"
+      - "datasets/**"
+      - "src/mrds/features/**"
+      - "config/**"
+  workflow_dispatch: {}
+  schedule:
+    # Nightly full run (no --max-cases) to catch drift on the complete dataset.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FEATURE: email_classifier
+  MRDS_DATABASE_PATH: data/eval.db
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Restore baseline database
+        uses: actions/cache/restore@v4
+        with:
+          path: data/eval.db
+          key: mrds-baseline-${{ env.FEATURE }}-${{ github.run_id }}
+          restore-keys: |
+            mrds-baseline-${{ env.FEATURE }}-
+
+      - name: Preflight (API key availability)
+        id: preflight
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OPENAI_API_KEY is not set (e.g. a fork PR); skipping the live gate."
+          else
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Evaluate candidate
+        if: steps.preflight.outputs.has_key == 'true'
+        run: |
+          set -euo pipefail
+          # Pull requests run a cheap smoke subset; main/nightly run the full set.
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            EXTRA="--max-cases 25"
+          fi
+          mrds evaluate --feature "$FEATURE" --segment-field category \
+            --triggered-by ci --git-sha "${{ github.sha }}" $EXTRA | tee eval.out
+          RUN_ID="$(sed -n 's/^run_id: //p' eval.out)"
+          echo "RUN_ID=${RUN_ID}" >> "$GITHUB_ENV"
+
+      - name: Compare against baseline (the gate)
+        if: steps.preflight.outputs.has_key == 'true'
+        # `mrds compare` exits 1 on a blocking regression, 0 otherwise (incl. "no
+        # baseline yet"). That exit code is the merge gate — do not mask it.
+        run: mrds compare --feature "$FEATURE" --run "$RUN_ID" --report-dir reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mrds-reports-${{ github.run_id }}
+          path: reports/
+          if-no-files-found: ignore
+
+      - name: Promote baseline (green main only)
+        if: >-
+          steps.preflight.outputs.has_key == 'true' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
+        run: |
+          mrds promote-baseline --run "$RUN_ID" --promoted-by ci \
+            --note "auto-promote on green main (${{ github.sha }})"
+
+      - name: Save baseline database (green main only)
+        if: >-
+          steps.preflight.outputs.has_key == 'true' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: data/eval.db
+          key: mrds-baseline-${{ env.FEATURE }}-${{ github.run_id }}

@@ -1,0 +1,32 @@
+"""SQLite system-of-record persistence layer.
+
+Feature-agnostic, repository-pattern storage for runs, test results, regressions,
+baselines, and prompt/dataset versions. :class:`EvaluationStore` is the high-level
+API; it integrates with the existing evaluation/regression models without changing
+their public contracts.
+"""
+
+from mrds.db.connection import Database, open_database
+from mrds.db.errors import DbError
+from mrds.db.records import (
+    BaselineRecord,
+    DatasetVersionRecord,
+    PromptVersionRecord,
+    RegressionRecord,
+    RunRecord,
+    TestResultRecord,
+)
+from mrds.db.store import EvaluationStore
+
+__all__ = [
+    "BaselineRecord",
+    "Database",
+    "DatasetVersionRecord",
+    "DbError",
+    "EvaluationStore",
+    "PromptVersionRecord",
+    "RegressionRecord",
+    "RunRecord",
+    "TestResultRecord",
+    "open_database",
+]
