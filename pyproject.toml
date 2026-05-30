@@ -17,6 +17,7 @@ keywords = ["llm", "evaluation", "regression", "ci", "ml-infrastructure"]
 dependencies = [
     "pydantic>=2.6",
     "pydantic-settings[yaml]>=2.2",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
