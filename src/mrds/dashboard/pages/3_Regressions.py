@@ -7,6 +7,21 @@ import streamlit as st
 from mrds.dashboard._shared import feature_selector, get_data
 
 st.title("Regressions")
+st.caption("Where a run scored worse than the trusted baseline.")
+st.info(
+    "**What is a regression?** When a new run scores measurably worse than the baseline, "
+    "MRDS flags each metric that moved the wrong way and rates how serious it is."
+)
+
+with st.expander("Severity, and why deployments get blocked"):
+    st.markdown(
+        "- 🟡 **WARNING** — a noticeable dip worth reviewing, but not release-blocking.\n"
+        "- 🔴 **CRITICAL** — a drop big enough that shipping is risky. In CI this fails the "
+        "build and **blocks the merge**, exactly like a failing test.\n"
+        "- **delta** — how much the metric changed vs the baseline; the detector has already "
+        "decided this move is bad.\n"
+        "- **No regressions** = the run held up against the baseline. That's the good outcome."
+    )
 
 data = get_data()
 feature = feature_selector(data, key="regressions_feature")

@@ -14,6 +14,30 @@ st.set_page_config(page_title="MRDS Dashboard", layout="wide")
 st.title("Model Regression Detection System")
 st.caption("Read-only view of evaluation history, trends, regressions, and baselines.")
 
+st.info(
+    "**A safety net for AI features.** Just as unit tests and CI stop broken code from "
+    "shipping, MRDS runs an AI feature against a fixed set of hand-labeled examples, scores "
+    "the results, and compares each new run against a trusted 'known-good' run (the "
+    "*baseline*). If quality drops too far, deployments are blocked."
+)
+
+with st.expander("What am I looking at? — the four pages"):
+    st.markdown(
+        "- **Runs** — every evaluation of the feature, with its scores. Inspect one run here.\n"
+        "- **Trends** — how scores, speed, and cost move across runs over time.\n"
+        "- **Regressions** — where a run got worse than the baseline, and how serious it is.\n"
+        "- **Baselines** — which run is the current 'known-good' bar everything compares to."
+    )
+
+with st.expander("Key terms, in plain English"):
+    st.markdown(
+        "- **Run** — one evaluation of the feature against the test set.\n"
+        "- **Pass rate** — share of test cases the feature got fully right. Higher is better.\n"
+        "- **Baseline** — the trusted 'known-good' run that new runs are measured against.\n"
+        "- **Regression** — a new run doing measurably worse than the baseline.\n"
+        "- **Severity** — WARNING (worth a look) vs CRITICAL (bad enough to block a release)."
+    )
+
 data = get_data()
 features = data.features()
 

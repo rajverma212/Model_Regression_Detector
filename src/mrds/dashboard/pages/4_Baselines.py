@@ -7,6 +7,20 @@ import streamlit as st
 from mrds.dashboard._shared import feature_selector, get_data
 
 st.title("Baselines")
+st.caption("The trusted 'known-good' run that every new run is compared against.")
+st.info(
+    "**What is a baseline?** One specific run, marked as the trusted bar for quality. Exactly "
+    "one baseline is active per feature, and every new run is measured against it."
+)
+
+with st.expander("Why comparisons use a baseline"):
+    st.markdown(
+        "- Without a fixed reference, a 6% drop looks like a normal day — a baseline gives an "
+        "objective 'better or worse than what we trust?' line.\n"
+        "- Baselines are promoted **deliberately** (or automatically when `main` is green), so "
+        "a worse run never silently becomes the new bar.\n"
+        "- **Promotion history** shows every time the bar moved, and who or what moved it."
+    )
 
 data = get_data()
 feature = feature_selector(data, key="baselines_feature")

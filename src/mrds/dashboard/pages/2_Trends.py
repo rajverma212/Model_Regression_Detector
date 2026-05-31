@@ -8,6 +8,21 @@ import streamlit as st
 from mrds.dashboard._shared import feature_selector, get_data
 
 st.title("Trends")
+st.caption("Each point is one run, oldest to newest.")
+st.info(
+    "**What am I looking at?** Trends show whether the feature is improving, holding steady, "
+    "or sliding over time. Each line tracks one metric across past runs."
+)
+
+with st.expander("How to read these charts"):
+    st.markdown(
+        "- **Pass rate** — higher is better; a downward step warns a change hurt quality.\n"
+        "- **Scorer means** — per-aspect quality; one scorer dropping pinpoints *what* "
+        "got worse.\n"
+        "- **Latency (ms)** — time per case; lower is better. **p95** is the slow tail "
+        "(95% of cases are faster than this).\n"
+        "- **Token usage** — a stand-in for cost; lower is better. A jump means pricier runs."
+    )
 
 data = get_data()
 feature = feature_selector(data, key="trends_feature")
