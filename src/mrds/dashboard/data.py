@@ -8,6 +8,7 @@ metrics snapshot into chartable :class:`TrendPoint`s. Nothing here writes.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -15,6 +16,8 @@ from mrds.db import EvaluationStore
 from mrds.db.records import BaselineRecord, RegressionRecord, RunRecord
 from mrds.evaluation.models import AggregateMetrics, CaseResult, EvaluationResult
 from mrds.observability.logging import get_logger
+from mrds.regression.detector import RegressionDetector
+from mrds.regression.models import RegressionResult
 
 logger = get_logger(__name__)
 
@@ -96,6 +99,55 @@ def build_run_label(
 
 
 @dataclass(frozen=True)
+class FeatureOverview:
+    """Headline status for one feature, for the home page panel."""
+
+    feature: str
+    display_name: str
+    run_count: int
+    latest_run_label: str | None
+    latest_pass_rate: float | None
+    runs_with_regressions: int
+    health: str  # "healthy" | "warning" | "critical" | "unknown"
+
+
+def _health_from_severities(severities: list[str]) -> str:
+    """Reduce a run's regression severities to a single health verdict."""
+    if "critical" in severities:
+        return "critical"
+    if "warning" in severities:
+        return "warning"
+    return "healthy"
+
+
+def humanize_metric_name(name: str) -> str:
+    """Turn a flattened metric name into a readable label (pure).
+
+    e.g. ``scorer.category_match.mean_score`` -> ``category_match — mean score``,
+    ``latency.p95_ms`` -> ``Latency (p95 ms)``, ``segment.billing.category_match``
+    -> ``billing / category_match``. Reused anywhere a flattened name is shown.
+    """
+    if name == "pass_rate":
+        return "Pass rate"
+    if name == "errored":
+        return "Errored cases"
+    if name.startswith("latency."):
+        stat = name.split(".", 1)[1].replace("_ms", "").replace("_", " ")
+        return f"Latency ({stat} ms)"
+    if name.startswith("tokens."):
+        key = name.split(".", 1)[1]
+        mapping = {"total_tokens": "Total tokens", "mean_tokens_per_case": "Tokens per case"}
+        return mapping.get(key, key.replace("_", " ").capitalize())
+    if name.startswith("scorer."):
+        _, scorer, metric = name.split(".", 2)
+        return f"{scorer} — {metric.replace('_', ' ')}"
+    if name.startswith("segment."):
+        _, segment, scorer = name.split(".", 2)
+        return f"{segment} / {scorer}"
+    return name
+
+
+@dataclass(frozen=True)
 class ScorerExplanation:
     """One scorer's verdict on a case, with its human-readable reason."""
 
@@ -132,6 +184,57 @@ def _primary_input_text(input_data: dict[str, object]) -> str:
     """Return the single string field of an input dict, if there is exactly one."""
     str_values = [value for value in input_data.values() if isinstance(value, str)]
     return str_values[0] if len(str_values) == 1 else ""
+
+
+def case_outcome(case: CaseResult) -> str:
+    """Classify a case as ``"passed"``, ``"failed"``, or ``"errored"``."""
+    if case.error is not None:
+        return "errored"
+    return "passed" if case.passed else "failed"
+
+
+def case_category(case: CaseResult, segment_field: str | None) -> str | None:
+    """The case's segment value (e.g. its category), or ``None`` if not applicable."""
+    if not segment_field:
+        return None
+    value = case.expected_output.get(segment_field)
+    return str(value) if value is not None else None
+
+
+def filter_cases(
+    cases: Sequence[CaseResult],
+    *,
+    outcomes: Sequence[str] | None = None,
+    categories: Sequence[str] | None = None,
+    difficulties: Sequence[str] | None = None,
+    search: str = "",
+    segment_field: str | None = None,
+) -> list[CaseResult]:
+    """Filter cases by outcome, category, difficulty, and a text search (pure).
+
+    A ``None`` filter means "no constraint" on that axis. Search matches the case id
+    or any string value in the case's input, case-insensitively. The category filter
+    only applies when ``segment_field`` is given.
+    """
+    needle = search.strip().lower()
+    selected: list[CaseResult] = []
+    for case in cases:
+        if outcomes is not None and case_outcome(case) not in outcomes:
+            continue
+        if difficulties is not None and case.expected_difficulty.value not in difficulties:
+            continue
+        if (
+            categories is not None
+            and segment_field
+            and case_category(case, segment_field) not in categories
+        ):
+            continue
+        if needle:
+            haystack = (case.case_id + " " + " ".join(str(v) for v in case.input.values())).lower()
+            if needle not in haystack:
+                continue
+        selected.append(case)
+    return selected
 
 
 def explain_case(case: CaseResult) -> CaseExplanation:
@@ -217,6 +320,43 @@ class DashboardData:
         """``run_uuid -> RunLabel`` for a feature's runs (for lookup by uuid)."""
         return {label.run_uuid: label for label in self.run_labels(feature, limit=limit)}
 
+    def feature_overview(self, feature: str, *, limit: int = 100) -> FeatureOverview:
+        """Headline status for a feature: run count, latest pass rate, and health.
+
+        Health is the worst regression severity recorded against the **latest** run.
+        Stats come from the lightweight run rows (latest pass rate is read from the
+        stored ``metrics_json`` snapshot — no per-case reconstruction).
+        """
+        runs = self.runs(feature, limit=limit)
+        if not runs:
+            return FeatureOverview(
+                feature=feature,
+                display_name=_humanize_feature(feature),
+                run_count=0,
+                latest_run_label=None,
+                latest_pass_rate=None,
+                runs_with_regressions=0,
+                health="unknown",
+            )
+
+        latest = runs[0]
+        latest_pass_rate = AggregateMetrics.model_validate_json(latest.metrics_json).pass_rate
+        labels = self.run_label_map(feature, limit=limit)
+        latest_label = labels[latest.run_uuid].label if latest.run_uuid in labels else None
+        runs_with_regressions = sum(1 for run in runs if self.regressions_for_run(run.run_uuid))
+        latest_health = _health_from_severities(
+            [r.severity for r in self.regressions_for_run(latest.run_uuid)]
+        )
+        return FeatureOverview(
+            feature=feature,
+            display_name=_humanize_feature(feature),
+            run_count=len(runs),
+            latest_run_label=latest_label,
+            latest_pass_rate=latest_pass_rate,
+            runs_with_regressions=runs_with_regressions,
+            health=latest_health,
+        )
+
     def _dataset_version(self, dataset_version_id: int | None, cache: dict[int, str]) -> str:
         """Resolve a dataset version string by id, caching distinct lookups."""
         if dataset_version_id is None:
@@ -229,6 +369,20 @@ class DashboardData:
     def run_detail(self, run_uuid: str) -> EvaluationResult | None:
         """Full reconstructed run (metadata, metrics, per-case results)."""
         return self._store.get_evaluation_result(run_uuid)
+
+    def compare_runs(self, run_a_uuid: str, run_b_uuid: str) -> RegressionResult | None:
+        """Compare two runs directly (A = reference, B = new); deltas are ``B - A``.
+
+        Reuses the feature-agnostic :class:`RegressionDetector` — no new comparison
+        math. Reconstructs both runs (two reconstructions is cheap). Returns ``None``
+        if either run is missing. Both runs must belong to the same feature (the page
+        only offers same-feature runs); the detector enforces this otherwise.
+        """
+        run_a = self.run_detail(run_a_uuid)
+        run_b = self.run_detail(run_b_uuid)
+        if run_a is None or run_b is None:
+            return None
+        return RegressionDetector().compare(run_a, run_b)
 
     def regressions_for_run(self, run_uuid: str) -> list[RegressionRecord]:
         """Persisted regressions where ``run_uuid`` is the candidate."""

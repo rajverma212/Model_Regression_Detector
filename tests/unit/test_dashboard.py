@@ -7,7 +7,15 @@ from datetime import UTC, datetime
 import pytest
 
 from mrds.core.interfaces import ScoreResult
-from mrds.dashboard.data import DashboardData, TrendPoint, build_run_label, explain_case
+from mrds.dashboard.data import (
+    DashboardData,
+    TrendPoint,
+    build_run_label,
+    case_outcome,
+    explain_case,
+    filter_cases,
+    humanize_metric_name,
+)
 from mrds.datasets.models import Difficulty
 from mrds.db import EvaluationStore, open_database
 from mrds.evaluation.models import (
@@ -230,6 +238,34 @@ def test_explain_case_errored() -> None:
     assert exp.summary == "Errored — invalid model output"
 
 
+# -- feature overview -----------------------------------------------------------
+
+
+def test_feature_overview_reports_health_and_stats(data: DashboardData) -> None:
+    overview = data.feature_overview("email_classifier")
+    assert overview.display_name == "Email Classifier"
+    assert overview.run_count == 2
+    assert overview.latest_pass_rate == pytest.approx(0.80)  # latest run = run-2
+    assert overview.runs_with_regressions == 1  # only run-2 regressed
+    assert overview.health == "critical"  # run-2's drop vs run-1 is critical
+    assert overview.latest_run_label and "Email Classifier #2" in overview.latest_run_label
+
+
+def test_feature_overview_healthy_feature(data: DashboardData) -> None:
+    overview = data.feature_overview("rag_qa")
+    assert overview.run_count == 1
+    assert overview.runs_with_regressions == 0
+    assert overview.health == "healthy"
+
+
+def test_feature_overview_unknown_feature(data: DashboardData) -> None:
+    overview = data.feature_overview("nope")
+    assert overview.run_count == 0
+    assert overview.latest_pass_rate is None
+    assert overview.latest_run_label is None
+    assert overview.health == "unknown"
+
+
 # -- trends ---------------------------------------------------------------------
 
 
@@ -264,6 +300,129 @@ def test_regressions_for_run_without_regressions(data: DashboardData) -> None:
 
 def test_regressions_for_unknown_run(data: DashboardData) -> None:
     assert data.regressions_for_run("missing") == []
+
+
+# -- test log explorer (filtering) ----------------------------------------------
+
+
+def _explorer_case(
+    case_id: str,
+    *,
+    passed: bool,
+    error: str | None = None,
+    category: str = "billing",
+    difficulty: Difficulty = Difficulty.EASY,
+    text: str = "hello there",
+) -> CaseResult:
+    return CaseResult(
+        case_id=case_id,
+        expected_difficulty=difficulty,
+        input={"email_text": text},
+        expected_output={"category": category, "summary": "s"},
+        actual_output=None if error else {"category": category, "summary": "s"},
+        scores=[],
+        passed=passed,
+        latency_ms=1.0,
+        error=error,
+    )
+
+
+_EXPLORER_CASES = [
+    _explorer_case("a", passed=True, category="billing", difficulty=Difficulty.EASY, text="refund"),
+    _explorer_case(
+        "b", passed=False, category="technical", difficulty=Difficulty.HARD, text="crash"
+    ),
+    _explorer_case(
+        "c",
+        passed=False,
+        error="boom",
+        category="account",
+        difficulty=Difficulty.MEDIUM,
+        text="login",
+    ),
+]
+
+
+def test_case_outcome_classifies() -> None:
+    assert [case_outcome(c) for c in _EXPLORER_CASES] == ["passed", "failed", "errored"]
+
+
+def test_filter_cases_by_outcome() -> None:
+    matching = filter_cases(_EXPLORER_CASES, outcomes=["failed", "errored"])
+    assert [c.case_id for c in matching] == ["b", "c"]
+
+
+def test_filter_cases_by_difficulty_and_category() -> None:
+    by_diff = filter_cases(_EXPLORER_CASES, difficulties=["hard"])
+    assert [c.case_id for c in by_diff] == ["b"]
+    by_cat = filter_cases(_EXPLORER_CASES, categories=["account"], segment_field="category")
+    assert [c.case_id for c in by_cat] == ["c"]
+
+
+def test_filter_cases_by_search_matches_text_and_id() -> None:
+    assert [c.case_id for c in filter_cases(_EXPLORER_CASES, search="refund")] == ["a"]
+    assert [c.case_id for c in filter_cases(_EXPLORER_CASES, search="LOGIN")] == [
+        "c"
+    ]  # case-insensitive
+    # "b" appears in no input text, so this matches the case id only.
+    assert [c.case_id for c in filter_cases(_EXPLORER_CASES, search="b")] == ["b"]
+
+
+def test_filter_cases_none_means_no_constraint() -> None:
+    assert len(filter_cases(_EXPLORER_CASES)) == 3
+    # Category filter is ignored when no segment_field is supplied.
+    assert len(filter_cases(_EXPLORER_CASES, categories=["billing"], segment_field=None)) == 3
+
+
+# -- metric name humanizing -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("pass_rate", "Pass rate"),
+        ("errored", "Errored cases"),
+        ("latency.mean_ms", "Latency (mean ms)"),
+        ("latency.p95_ms", "Latency (p95 ms)"),
+        ("tokens.total_tokens", "Total tokens"),
+        ("tokens.mean_tokens_per_case", "Tokens per case"),
+        ("scorer.category_match.mean_score", "category_match — mean score"),
+        ("scorer.summary_quality.pass_rate", "summary_quality — pass rate"),
+        ("segment.billing.category_match", "billing / category_match"),
+        ("something_unknown", "something_unknown"),
+    ],
+)
+def test_humanize_metric_name(raw: str, expected: str) -> None:
+    assert humanize_metric_name(raw) == expected
+
+
+# -- run comparison -------------------------------------------------------------
+
+
+def test_compare_runs_returns_b_minus_a_deltas(data: DashboardData) -> None:
+    # A = run-1 (pass 0.95), B = run-2 (pass 0.80); delta = B - A.
+    comparison = data.compare_runs("run-1", "run-2")
+    assert comparison is not None
+    by_name = {c.name: c for c in comparison.comparisons}
+    pass_rate = by_name["pass_rate"]
+    assert pass_rate.baseline_value == pytest.approx(0.95)
+    assert pass_rate.candidate_value == pytest.approx(0.80)
+    assert pass_rate.delta == pytest.approx(-0.15)
+
+
+def test_compare_runs_direction_is_respected(data: DashboardData) -> None:
+    # Swapping A and B flips the sign of the delta.
+    forward = data.compare_runs("run-1", "run-2")
+    backward = data.compare_runs("run-2", "run-1")
+    assert forward is not None and backward is not None
+    fwd = {c.name: c for c in forward.comparisons}["pass_rate"]
+    bwd = {c.name: c for c in backward.comparisons}["pass_rate"]
+    assert fwd.delta == pytest.approx(-bwd.delta)
+
+
+def test_compare_runs_missing_returns_none(data: DashboardData) -> None:
+    assert data.compare_runs("run-1", "missing") is None
+    assert data.compare_runs("missing", "run-1") is None
 
 
 # -- baselines ------------------------------------------------------------------

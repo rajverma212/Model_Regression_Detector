@@ -153,12 +153,15 @@ mrds promote-baseline --run <run-id> --promoted-by you --note "v2 prompt looks g
 
 ## 7. Dashboard Overview
 
-A **read-only** [Streamlit](https://streamlit.io) app that reads straight from the SQLite system of record — it never writes during normal operation. Four pages:
+A **read-only** [Streamlit](https://streamlit.io) app that reads straight from the SQLite system of record — it never writes during normal operation. A home overview plus four pages:
 
-- **Runs** — every evaluation run with its prompt/dataset/model, pass rate, latency, tokens, and status.
+- **Home** — a business-framed overview of each feature under test (what it does, what its categories mean) and a live **health verdict** (🟢 Healthy / 🟡 Warning / 🔴 Blocked) for its latest run, with headline stats.
+- **Runs** — every evaluation run with its prompt/dataset/model, pass rate, latency, tokens, and status. Each failing case is **explained**: the model's actual output vs. what was expected, and the per-check reason it failed (passing cases are inspectable on demand).
 - **Trends** — metric history over time per feature, to see quality drift at a glance.
 - **Regressions** — detected regressions with severity, the offending metrics, and the baseline they were measured against.
 - **Baselines** — the currently promoted baseline per feature, plus promotion history (who, when, why).
+
+Runs are shown with **human-readable names** (e.g. *Email Classifier #12 · gpt-4o-mini · Dataset v1 · Jun 2, 2026*) throughout tables, pickers, and charts, while the internal run id is preserved for traceability.
 
 The dashboard is hardened for public hosting: it degrades gracefully and falls back safely if optional configuration is missing.
 

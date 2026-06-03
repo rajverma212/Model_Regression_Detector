@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from mrds.dashboard._shared import feature_selector, get_data, render_case, render_page_help
+from mrds.dashboard.data import filter_cases
 
 st.title("Runs")
 render_page_help("runs")
@@ -87,14 +88,54 @@ if feature:
                 use_container_width=True,
             )
 
-            st.markdown("**Failures — why they didn't pass**")
-            failures = [c for c in result.per_case_results if not c.passed]
-            if not failures:
+            st.markdown("**Test log explorer** — browse every case and see why it passed or failed")
+            cases = result.per_case_results
+            segment_field = metrics.segment_field
+            if not any(c.passed is False for c in cases):
                 st.success("Every case passed. 🎉")
-            else:
-                st.caption(
-                    f"{len(failures)} of {len(result.per_case_results)} cases failed or errored. "
-                    "Open one to see the model's actual output vs. what was expected."
+
+            # Filters. Outcome defaults to failures so they stay front-and-centre; an
+            # empty selection on any axis means "no filter" (show all).
+            fcol1, fcol2, fcol3 = st.columns(3)
+            outcomes = fcol1.multiselect(
+                "Outcome",
+                ["passed", "failed", "errored"],
+                default=["failed", "errored"],
+                key="runs_outcomes",
+            )
+            difficulties_all = sorted({c.expected_difficulty.value for c in cases})
+            difficulties = fcol2.multiselect(
+                "Difficulty", difficulties_all, default=difficulties_all, key="runs_difficulty"
+            )
+            categories: list[str] | None = None
+            if segment_field:
+                categories_all = sorted(
+                    {
+                        str(c.expected_output[segment_field])
+                        for c in cases
+                        if c.expected_output.get(segment_field) is not None
+                    }
                 )
-                for case in failures:
-                    render_case(case, expanded=len(failures) <= 3)
+                categories = fcol3.multiselect(
+                    segment_field.capitalize(),
+                    categories_all,
+                    default=categories_all,
+                    key="runs_category",
+                )
+            search = st.text_input("Search input text or case id", key="runs_search")
+
+            matching = filter_cases(
+                cases,
+                outcomes=outcomes or None,
+                categories=(categories or None) if segment_field else None,
+                difficulties=difficulties or None,
+                search=search,
+                segment_field=segment_field,
+            )
+            st.caption(f"Showing {len(matching)} of {len(cases)} cases.")
+            if not matching:
+                st.info("No cases match the current filters.")
+            else:
+                # render_case opens its own expander; render at top level (no nesting).
+                for case in matching:
+                    render_case(case, expanded=len(matching) <= 3)
