@@ -50,6 +50,8 @@ if feature:
                 if baseline_pr is not None
                 else None
             )
+
+            # Evidence: headline tiles.
             col1, col2, col3, col4 = st.columns(4)
             col1.metric(
                 "Pass rate",
@@ -60,42 +62,56 @@ if feature:
             col2.metric("Passed", metrics.passed, help=KPI_HELP["passed"])
             col3.metric("Failed", metrics.failed, help=KPI_HELP["failed"])
             col4.metric("Errored", metrics.errored, help=KPI_HELP["errored"])
+
+            # Conclusion: one-line verdict under the tiles, from values already shown.
+            rec = perfect_run_recommendations(
+                result.per_case_results,
+                segment_field=metrics.segment_field,
+                baseline_pass_rate=baseline_pr,
+            )
+            if rec.is_perfect:
+                st.markdown(f"### 🟢 All {rec.total_cases} cases passing")
+            elif rec.gap_to_baseline is not None:
+                st.markdown(
+                    f"### 🔴 {rec.gap_to_baseline:.0%} below baseline · "
+                    f"{rec.failing_cases} of {rec.total_cases} cases failing"
+                )
+            else:
+                st.markdown(f"### 🟡 {rec.failing_cases} of {rec.total_cases} cases failing")
+
             st.caption(
                 f"prompt {result.prompt_version} · dataset {result.dataset_version} "
                 f"· model {result.model} · {result.duration_seconds:.2f}s"
             )
 
-            st.markdown("**Scorer metrics**")
-            st.dataframe(
-                [
-                    {"scorer": s.name, "mean_score": s.mean_score, "pass_rate": s.pass_rate}
-                    for s in metrics.scorers.values()
-                ],
-                use_container_width=True,
-            )
-
-            if metrics.segments:
-                st.markdown(f"**Segment metrics (by {metrics.segment_field})**")
+            # Evidence: scores tucked behind expanders; the weakest segment stays visible.
+            with st.expander("Scores by check (scorer)"):
                 st.dataframe(
                     [
-                        {"segment": s.segment, "count": s.count, "pass_rate": s.pass_rate}
-                        for s in metrics.segments.values()
+                        {"scorer": s.name, "mean_score": s.mean_score, "pass_rate": s.pass_rate}
+                        for s in metrics.scorers.values()
                     ],
                     use_container_width=True,
                 )
+
+            if metrics.segments:
                 weakest = min(metrics.segments.values(), key=lambda s: s.pass_rate)
                 st.caption(
                     f"Weakest {metrics.segment_field}: **{weakest.segment}** "
                     f"({weakest.pass_rate:.0%} pass). Filter the explorer below by "
                     f"{metrics.segment_field} = {weakest.segment} to see its cases."
                 )
+                with st.expander(f"Scores by {metrics.segment_field} (segment)"):
+                    st.dataframe(
+                        [
+                            {"segment": s.segment, "count": s.count, "pass_rate": s.pass_rate}
+                            for s in metrics.segments.values()
+                        ],
+                        use_container_width=True,
+                    )
 
+            # Details: how to reach a perfect run (reuses the conclusion's rec).
             st.markdown("**How to reach a perfect run**")
-            rec = perfect_run_recommendations(
-                result.per_case_results,
-                segment_field=metrics.segment_field,
-                baseline_pass_rate=baseline_pr,
-            )
             if rec.is_perfect:
                 st.success("This run already passes every case. 🎉")
             else:
@@ -121,22 +137,7 @@ if feature:
                     "actual output for each."
                 )
 
-            st.markdown("**Per-case results**")
-            st.dataframe(
-                [
-                    {
-                        "case": c.case_id,
-                        "difficulty": c.expected_difficulty.value,
-                        "passed": c.passed,
-                        "latency_ms": c.latency_ms,
-                        "tokens": c.total_tokens,
-                        "error": c.error or "",
-                    }
-                    for c in result.per_case_results
-                ],
-                use_container_width=True,
-            )
-
+            # Details: the test-log explorer is the single primary case surface.
             st.markdown("**Test log explorer** — browse every case and see why it passed or failed")
             cases = result.per_case_results
             segment_field = metrics.segment_field
@@ -188,3 +189,21 @@ if feature:
                 # render_case opens its own expander; render at top level (no nesting).
                 for case in matching:
                     render_case(case, expanded=len(matching) <= 3)
+
+            # Details: the flat per-case table (its unique value is per-case latency/tokens),
+            # folded away so the explorer above is the primary case surface.
+            with st.expander("All cases (table view) — includes per-case latency & tokens"):
+                st.dataframe(
+                    [
+                        {
+                            "case": c.case_id,
+                            "difficulty": c.expected_difficulty.value,
+                            "passed": c.passed,
+                            "latency_ms": c.latency_ms,
+                            "tokens": c.total_tokens,
+                            "error": c.error or "",
+                        }
+                        for c in result.per_case_results
+                    ],
+                    use_container_width=True,
+                )

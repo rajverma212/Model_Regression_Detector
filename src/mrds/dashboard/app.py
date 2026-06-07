@@ -31,20 +31,26 @@ features = data.features()
 if not features:
     st.info("No runs recorded yet. Use the CLI: `mrds evaluate --feature <name>`.")
 else:
-    st.metric("Features under test", len(features), help=KPI_HELP["features"])
+    # Demoted from a headline tile to a small caption — a count, not an answer.
+    st.caption(f"{len(features)} feature(s) under test.")
     for feature in features:
         overview = data.feature_overview(feature)
         info = FEATURE_INFO.get(feature)
+        title = info.title if info else overview.display_name
 
         st.divider()
-        st.subheader(info.title if info else overview.display_name)
+        # Conclusion: feature name + health verdict, with its caption directly under it.
+        st.subheader(f"{title} — {HEALTH_BADGE[overview.health]}")
+        caption = HEALTH_CAPTION[overview.health]
+        if overview.latest_run_label:
+            caption += f" Latest: {overview.latest_run_label}."
+        st.caption(caption)
         if info:
             st.write(info.summary)
-            for bullet in info.bullets:
-                st.markdown(f"- {bullet}")
 
+        # Evidence: verdict-first tile row.
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Runs", overview.run_count, help=KPI_HELP["runs"])
+        col1.metric("Health", HEALTH_BADGE[overview.health], help=KPI_HELP["health"])
         col2.metric(
             "Latest pass rate",
             f"{overview.latest_pass_rate:.1%}" if overview.latest_pass_rate is not None else "—",
@@ -55,12 +61,13 @@ else:
             overview.runs_with_regressions,
             help=KPI_HELP["runs_with_regressions"],
         )
-        col4.metric("Health", HEALTH_BADGE[overview.health], help=KPI_HELP["health"])
+        col4.metric("Runs", overview.run_count, help=KPI_HELP["runs"])
 
-        caption = HEALTH_CAPTION[overview.health]
-        if overview.latest_run_label:
-            caption += f" Latest: {overview.latest_run_label}."
-        st.caption(caption)
+        # Details: what the feature classifies.
+        if info and info.bullets:
+            with st.expander("What it classifies"):
+                for bullet in info.bullets:
+                    st.markdown(f"- {bullet}")
 
     st.divider()
     st.write("Open a page from the sidebar: **Runs**, **Trends**, **Regressions**, **Baselines**.")
