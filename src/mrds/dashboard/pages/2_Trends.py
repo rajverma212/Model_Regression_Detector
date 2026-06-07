@@ -18,6 +18,19 @@ if feature:
     if not points:
         st.info("No runs to chart yet.")
     else:
+        # Conclusion: read the latest pass-rate movement in words.
+        if len(points) >= 2:
+            previous, latest = points[-2].pass_rate, points[-1].pass_rate
+            verb = "rose" if latest > previous else "fell" if latest < previous else "held"
+            if verb == "held":
+                st.markdown(f"### Pass rate held at {latest:.0%} on the latest run")
+            else:
+                st.markdown(
+                    f"### Pass rate {verb} from {previous:.0%} to {latest:.0%} on the latest run"
+                )
+        else:
+            st.markdown(f"### Pass rate is {points[-1].pass_rate:.0%} (first run)")
+
         labels = data.run_label_map(feature)
         frame = pd.DataFrame(
             [
@@ -43,8 +56,10 @@ if feature:
             st.subheader("Scorer means")
             st.line_chart(frame[scorer_columns])
 
-        st.subheader("Latency (ms)")
-        st.line_chart(frame[["mean_latency_ms", "p95_latency_ms"]])
+        # Details: speed & cost are secondary to the quality question — tucked away.
+        with st.expander("Speed & cost over time"):
+            st.subheader("Latency (ms)")
+            st.line_chart(frame[["mean_latency_ms", "p95_latency_ms"]])
 
-        st.subheader("Token usage")
-        st.line_chart(frame[["total_tokens"]])
+            st.subheader("Token usage")
+            st.line_chart(frame[["total_tokens"]])

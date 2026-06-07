@@ -46,6 +46,23 @@ if feature:
                     "🟡 **Regression detected** — a noticeable dip worth reviewing "
                     "(not release-blocking)."
                 )
+
+            # Conclusion: one-line summary of how many regressed and the worst offender.
+            if comparison is not None and comparison.regressions:
+                worst = max(
+                    comparison.regressions,
+                    key=lambda c: (c.severity.value == "critical", abs(c.relative_delta or 0.0)),
+                )
+                worst_delta = (
+                    f"{worst.relative_delta:+.1%}"
+                    if worst.relative_delta is not None
+                    else f"{worst.delta:+.4g}"
+                )
+                st.caption(
+                    f"{len(comparison.regressions)} metric(s) regressed; "
+                    f"worst: {humanize_metric_name(worst.name)} ({worst_delta})."
+                )
+
             if baseline_uuid:
                 baseline_label = (
                     labels[baseline_uuid].label if baseline_uuid in labels else baseline_uuid
@@ -56,26 +73,28 @@ if feature:
             # fall back to the persisted records if the baseline can't be reconstructed.
             regressed = comparison.regressions if comparison is not None else []
             if regressed:
-                st.markdown("**Regressed metrics — and why**")
-                st.dataframe(
-                    [
-                        {
-                            "metric": humanize_metric_name(mc.name),
-                            "baseline": round(mc.baseline_value, 4),
-                            "candidate": round(mc.candidate_value, 4),
-                            "Δ": round(mc.delta, 4),
-                            "Δ%": (
-                                f"{mc.relative_delta:+.1%}"
-                                if mc.relative_delta is not None
-                                else "—"
-                            ),
-                            "severity": SEVERITY_BADGE[mc.severity.value],
-                            "why": mc.reason,
-                        }
-                        for mc in regressed
-                    ],
-                    use_container_width=True,
-                )
+                # Evidence: the full regressed-metrics table, folded so the root-cause
+                # drill below stays prominent.
+                with st.expander(f"All regressed metrics ({len(regressed)}) — and why"):
+                    st.dataframe(
+                        [
+                            {
+                                "metric": humanize_metric_name(mc.name),
+                                "baseline": round(mc.baseline_value, 4),
+                                "candidate": round(mc.candidate_value, 4),
+                                "Δ": round(mc.delta, 4),
+                                "Δ%": (
+                                    f"{mc.relative_delta:+.1%}"
+                                    if mc.relative_delta is not None
+                                    else "—"
+                                ),
+                                "severity": SEVERITY_BADGE[mc.severity.value],
+                                "why": mc.reason,
+                            }
+                            for mc in regressed
+                        ],
+                        use_container_width=True,
+                    )
             else:
                 st.dataframe(
                     [

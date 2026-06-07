@@ -38,20 +38,7 @@ if feature:
             if comparison is None:
                 st.warning("Could not load one of the selected runs.")
             else:
-                # What changed between the two runs — the attribution for any movement.
-                prompt_note = (
-                    f"**Prompt:** {comparison.baseline_prompt_version} → "
-                    f"{comparison.candidate_prompt_version}"
-                    f" {'*(changed)*' if comparison.prompt_changed else '*(unchanged)*'}"
-                )
-                dataset_note = (
-                    f"**Dataset:** {comparison.baseline_dataset_version} → "
-                    f"{comparison.candidate_dataset_version}"
-                    f" {'*(changed)*' if comparison.dataset_changed else '*(unchanged)*'}"
-                )
-                st.caption(f"{prompt_note}  ·  {dataset_note}")
-
-                # Overall verdict: regressions are drops from A to B (improvements are not).
+                # Conclusion: overall verdict first (regressions are drops A->B; gains are not).
                 if comparison.severity.value == "pass":
                     st.success("🟢 No regressions from Run A to Run B.")
                 else:
@@ -61,7 +48,7 @@ if feature:
                         f"{comparison.warning_count} warning metric(s) regressed from A to B."
                     )
 
-                # Headline tiles: pass rate + each scorer's mean (all higher-is-better).
+                # Evidence: headline tiles (pass rate + each scorer's mean, higher-is-better).
                 headline = [
                     c
                     for c in comparison.comparisons
@@ -81,21 +68,37 @@ if feature:
                                 delta=f"{c.delta:+.2f}" if c.delta else None,
                             )
 
-                st.markdown("**All metrics** — what moved, and why it matters")
-                st.dataframe(
-                    [
-                        {
-                            "metric": humanize_metric_name(c.name),
-                            "Run A": round(c.baseline_value, 4),
-                            "Run B": round(c.candidate_value, 4),
-                            "Δ (B − A)": round(c.delta, 4),
-                            "Δ%": (
-                                f"{c.relative_delta:+.1%}" if c.relative_delta is not None else "—"
-                            ),
-                            "verdict": SEVERITY_BADGE[c.severity.value],
-                            "why": c.reason,
-                        }
-                        for c in comparison.comparisons
-                    ],
-                    use_container_width=True,
+                # Evidence: what changed between the runs — context for any movement.
+                prompt_note = (
+                    f"**Prompt:** {comparison.baseline_prompt_version} → "
+                    f"{comparison.candidate_prompt_version}"
+                    f" {'*(changed)*' if comparison.prompt_changed else '*(unchanged)*'}"
                 )
+                dataset_note = (
+                    f"**Dataset:** {comparison.baseline_dataset_version} → "
+                    f"{comparison.candidate_dataset_version}"
+                    f" {'*(changed)*' if comparison.dataset_changed else '*(unchanged)*'}"
+                )
+                st.caption(f"{prompt_note}  ·  {dataset_note}")
+
+                # Details: the full per-metric table, folded away.
+                with st.expander(f"All metrics ({len(comparison.comparisons)})"):
+                    st.dataframe(
+                        [
+                            {
+                                "metric": humanize_metric_name(c.name),
+                                "Run A": round(c.baseline_value, 4),
+                                "Run B": round(c.candidate_value, 4),
+                                "Δ (B − A)": round(c.delta, 4),
+                                "Δ%": (
+                                    f"{c.relative_delta:+.1%}"
+                                    if c.relative_delta is not None
+                                    else "—"
+                                ),
+                                "verdict": SEVERITY_BADGE[c.severity.value],
+                                "why": c.reason,
+                            }
+                            for c in comparison.comparisons
+                        ],
+                        use_container_width=True,
+                    )
