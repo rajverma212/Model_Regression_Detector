@@ -43,6 +43,21 @@ FEATURE_INFO: dict[str, FeatureInfo] = {
             "**General** — anything else: feedback, thanks, broad questions.",
         ),
     ),
+    "ticket_router": FeatureInfo(
+        title="Support Ticket Router",
+        summary=(
+            "Reads an inbound support ticket and routes it to the right queue, then assigns "
+            "a handling priority — so tickets land with the correct team at the right urgency "
+            "without manual triage."
+        ),
+        bullets=(
+            "**Billing** — payments, invoices, refunds, pricing.",
+            "**Technical support** — bugs, errors, outages, API/integration failures.",
+            "**Account access** — logins, lockouts, 2FA, profile and account changes.",
+            "**Feature request** — suggestions for new capabilities or enhancements.",
+            "**Priority** — high / medium / low, by how urgently the ticket needs handling.",
+        ),
+    ),
 }
 
 

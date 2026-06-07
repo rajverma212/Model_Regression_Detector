@@ -27,7 +27,6 @@ from mrds.evaluation.models import (
 )
 from mrds.features.email_classifier import (
     EmailCategory,
-    EmailClassificationInput,
     EmailClassificationOutput,
     EmailClassifierFeature,
 )
@@ -53,10 +52,8 @@ class ConstantEmailClient:
 
 def _runtime() -> CliRuntime:
     prompts = PromptRegistry.from_directory(Path("prompts"))
-    datasets = DatasetRegistry.from_directory(
-        Path("datasets"),
-        model_resolver=lambda _f: (EmailClassificationInput, EmailClassificationOutput),
-    )
+    # Default (registry-based) resolver — the datasets dir is multi-feature.
+    datasets = DatasetRegistry.from_directory(Path("datasets"))
     feature = EmailClassifierFeature(client=ConstantEmailClient(), prompt_registry=prompts)
     features = FeatureRegistry()
     features.register(feature)

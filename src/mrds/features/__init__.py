@@ -9,10 +9,12 @@ classifier — implement :class:`~mrds.core.interfaces.Feature`, then register i
 
 from mrds.core.registry import feature_registry
 from mrds.features.email_classifier import build_feature as build_email_classifier
+from mrds.features.ticket_router import build_feature as build_ticket_router
 
 # Factories for every built-in feature. Add future features to this mapping.
 _FEATURE_FACTORIES = {
     "email_classifier": build_email_classifier,
+    "ticket_router": build_ticket_router,
 }
 
 

@@ -62,7 +62,8 @@ def test_seed_creates_full_narrative(store: EvaluationStore) -> None:
     result = seed_demo(store, config=TEST_CONFIG)
     assert result.seeded is True
     assert len(result.run_ids) == len(DEFAULT_RUNS)
-    assert store.runs.features() == ["email_classifier"]
+    # The demo now seeds a second feature (ticket_router) additively; features() is sorted.
+    assert store.runs.features() == ["email_classifier", "ticket_router"]
     # A promoted baseline exists.
     assert result.baseline_run_id is not None
     assert store.baselines.get_active("email_classifier") is not None

@@ -15,7 +15,6 @@ from mrds.datasets.registry import DatasetRegistry
 from mrds.evaluation import EvaluationConfig, EvaluationEngine
 from mrds.features.email_classifier import (
     EmailCategory,
-    EmailClassificationInput,
     EmailClassificationOutput,
     EmailClassifierFeature,
 )
@@ -198,10 +197,8 @@ class HeuristicEmailClient:
 
 def test_real_email_classifier_integration() -> None:
     prompts = PromptRegistry.from_directory(Path("prompts"))
-    datasets = DatasetRegistry.from_directory(
-        Path("datasets"),
-        model_resolver=lambda _f: (EmailClassificationInput, EmailClassificationOutput),
-    )
+    # Default (registry-based) resolver — the datasets dir is multi-feature.
+    datasets = DatasetRegistry.from_directory(Path("datasets"))
     feature = EmailClassifierFeature(client=HeuristicEmailClient(), prompt_registry=prompts)
     features = FeatureRegistry()
     features.register(feature)

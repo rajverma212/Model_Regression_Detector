@@ -13,6 +13,7 @@ from mrds.demo.generator import (
     DemoRunSpec,
 )
 from mrds.demo.seed import SeedResult, seed_demo
+from mrds.demo.ticket_client import DeterministicTicketRouterClient
 
 __all__ = [
     "DEFAULT_DEMO_CONFIG",
@@ -20,6 +21,7 @@ __all__ = [
     "DemoConfig",
     "DemoRunSpec",
     "DeterministicEmailClient",
+    "DeterministicTicketRouterClient",
     "SeedResult",
     "seed_demo",
 ]

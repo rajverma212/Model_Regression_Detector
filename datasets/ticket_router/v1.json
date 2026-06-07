@@ -1,0 +1,147 @@
+{
+  "version": "v1",
+  "created_at": "2026-06-06",
+  "description": "Human-authored golden set for support ticket routing. 20 cases spanning all four queues (billing, technical_support, account_access, feature_request) with priority labels and deliberate edge cases: ambiguous intent and mixed-topic tickets.",
+  "cases": [
+    {
+      "id": "tr-001",
+      "input": { "ticket_text": "I was double-charged for my Pro plan this month — please refund the extra $30." },
+      "expected_output": { "category": "billing", "priority": "high" },
+      "expected_difficulty": "easy",
+      "notes": "Clear duplicate-charge billing case; money at risk -> high."
+    },
+    {
+      "id": "tr-002",
+      "input": { "ticket_text": "Could you send me the invoice for March? I need it for accounting." },
+      "expected_output": { "category": "billing", "priority": "low" },
+      "expected_difficulty": "easy",
+      "notes": "Informational invoice request -> low."
+    },
+    {
+      "id": "tr-003",
+      "input": { "ticket_text": "My card on file expired and the renewal failed. How do I update my payment method?" },
+      "expected_output": { "category": "billing", "priority": "medium" },
+      "expected_difficulty": "easy",
+      "notes": "Payment method update."
+    },
+    {
+      "id": "tr-004",
+      "input": { "ticket_text": "Why did my monthly price jump from $20 to $29 without any notice?" },
+      "expected_output": { "category": "billing", "priority": "medium" },
+      "expected_difficulty": "medium",
+      "notes": "Pricing complaint."
+    },
+    {
+      "id": "tr-005",
+      "input": { "ticket_text": "The promo code WELCOME20 did not apply the discount at checkout." },
+      "expected_output": { "category": "billing", "priority": "low" },
+      "expected_difficulty": "medium",
+      "notes": "Coupon not applied."
+    },
+    {
+      "id": "tr-006",
+      "input": { "ticket_text": "The dashboard returns a 500 error every time I open the Reports tab." },
+      "expected_output": { "category": "technical_support", "priority": "high" },
+      "expected_difficulty": "easy",
+      "notes": "Server error blocking a core page."
+    },
+    {
+      "id": "tr-007",
+      "input": { "ticket_text": "CSV export has produced an empty file since this morning." },
+      "expected_output": { "category": "technical_support", "priority": "high" },
+      "expected_difficulty": "easy",
+      "notes": "Broken export blocking work."
+    },
+    {
+      "id": "tr-008",
+      "input": { "ticket_text": "The mobile app freezes whenever I upload a photo larger than 5 MB." },
+      "expected_output": { "category": "technical_support", "priority": "medium" },
+      "expected_difficulty": "medium",
+      "notes": "Bug with a workaround."
+    },
+    {
+      "id": "tr-009",
+      "input": { "ticket_text": "API calls to /v2/orders are timing out intermittently for the last hour." },
+      "expected_output": { "category": "technical_support", "priority": "high" },
+      "expected_difficulty": "medium",
+      "notes": "Intermittent API outage."
+    },
+    {
+      "id": "tr-010",
+      "input": { "ticket_text": "The text in dark mode is hard to read on the settings page." },
+      "expected_output": { "category": "technical_support", "priority": "low" },
+      "expected_difficulty": "medium",
+      "notes": "Cosmetic UI bug -> low."
+    },
+    {
+      "id": "tr-011",
+      "input": { "ticket_text": "I can't log in after resetting my password — it says invalid credentials." },
+      "expected_output": { "category": "account_access", "priority": "high" },
+      "expected_difficulty": "easy",
+      "notes": "Login blocked after reset."
+    },
+    {
+      "id": "tr-012",
+      "input": { "ticket_text": "Please delete my account and all of the data associated with it." },
+      "expected_output": { "category": "account_access", "priority": "medium" },
+      "expected_difficulty": "easy",
+      "notes": "Account deletion request."
+    },
+    {
+      "id": "tr-013",
+      "input": { "ticket_text": "I'm locked out after too many login attempts. Can you unlock my account?" },
+      "expected_output": { "category": "account_access", "priority": "high" },
+      "expected_difficulty": "easy",
+      "notes": "Lockout, customer blocked."
+    },
+    {
+      "id": "tr-014",
+      "input": { "ticket_text": "How do I enable two-factor authentication on my profile?" },
+      "expected_output": { "category": "account_access", "priority": "low" },
+      "expected_difficulty": "medium",
+      "notes": "How-to for 2FA -> low."
+    },
+    {
+      "id": "tr-015",
+      "input": { "ticket_text": "I need to change the email address associated with my account." },
+      "expected_output": { "category": "account_access", "priority": "low" },
+      "expected_difficulty": "medium",
+      "notes": "Profile email change."
+    },
+    {
+      "id": "tr-016",
+      "input": { "ticket_text": "It would be great if you added a calendar view for tasks." },
+      "expected_output": { "category": "feature_request", "priority": "low" },
+      "expected_difficulty": "easy",
+      "notes": "Straightforward suggestion."
+    },
+    {
+      "id": "tr-017",
+      "input": { "ticket_text": "Please consider supporting Slack notifications for new comments." },
+      "expected_output": { "category": "feature_request", "priority": "low" },
+      "expected_difficulty": "easy",
+      "notes": "Integration suggestion."
+    },
+    {
+      "id": "tr-018",
+      "input": { "ticket_text": "Any plans to add bulk editing for records? It would save our team hours." },
+      "expected_output": { "category": "feature_request", "priority": "medium" },
+      "expected_difficulty": "medium",
+      "notes": "High-value suggestion; still a request, slightly elevated."
+    },
+    {
+      "id": "tr-019",
+      "input": { "ticket_text": "Could you add an option to export to Excel in addition to CSV?" },
+      "expected_output": { "category": "feature_request", "priority": "low" },
+      "expected_difficulty": "medium",
+      "notes": "Enhancement to existing export."
+    },
+    {
+      "id": "tr-020",
+      "input": { "ticket_text": "Our Zapier integration stopped working right after your latest pricing change." },
+      "expected_output": { "category": "technical_support", "priority": "high" },
+      "expected_difficulty": "hard",
+      "notes": "Ambiguous billing-vs-technical; the broken integration is the actionable issue -> technical_support."
+    }
+  ]
+}
