@@ -1,0 +1,70 @@
+{
+  "version": "v1",
+  "created_at": "2026-06-07",
+  "description": "Proof-of-concept golden set for the spec-driven sentiment classifier. 9 cases, 3 per sentiment.",
+  "cases": [
+    {
+      "id": "sp-001",
+      "input": { "text": "I love this product, it works perfectly!" },
+      "expected_output": { "sentiment": "positive" },
+      "expected_difficulty": "easy",
+      "notes": "Clear praise."
+    },
+    {
+      "id": "sp-002",
+      "input": { "text": "Amazing support — you solved my issue in minutes." },
+      "expected_output": { "sentiment": "positive" },
+      "expected_difficulty": "easy",
+      "notes": "Satisfaction with support."
+    },
+    {
+      "id": "sp-003",
+      "input": { "text": "Best purchase I've made all year, thank you!" },
+      "expected_output": { "sentiment": "positive" },
+      "expected_difficulty": "easy",
+      "notes": "Strong positive."
+    },
+    {
+      "id": "sp-004",
+      "input": { "text": "This is terrible, nothing works at all." },
+      "expected_output": { "sentiment": "negative" },
+      "expected_difficulty": "easy",
+      "notes": "Clear complaint."
+    },
+    {
+      "id": "sp-005",
+      "input": { "text": "I'm very disappointed with the service I received." },
+      "expected_output": { "sentiment": "negative" },
+      "expected_difficulty": "medium",
+      "notes": "Dissatisfaction."
+    },
+    {
+      "id": "sp-006",
+      "input": { "text": "The app crashes constantly and it's infuriating." },
+      "expected_output": { "sentiment": "negative" },
+      "expected_difficulty": "medium",
+      "notes": "Frustration with reliability."
+    },
+    {
+      "id": "sp-007",
+      "input": { "text": "How do I change the email address on my account?" },
+      "expected_output": { "sentiment": "neutral" },
+      "expected_difficulty": "easy",
+      "notes": "Plain question."
+    },
+    {
+      "id": "sp-008",
+      "input": { "text": "What are your business hours?" },
+      "expected_output": { "sentiment": "neutral" },
+      "expected_difficulty": "easy",
+      "notes": "Informational."
+    },
+    {
+      "id": "sp-009",
+      "input": { "text": "I'd like to know more about your pricing tiers." },
+      "expected_output": { "sentiment": "neutral" },
+      "expected_difficulty": "medium",
+      "notes": "Neutral inquiry."
+    }
+  ]
+}

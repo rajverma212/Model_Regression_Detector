@@ -1,0 +1,22 @@
+# Proof-of-concept feature defined ENTIRELY by specification (no per-feature Python).
+# Loaded by GenericStructuredFeature via the Phase 1 generation layer.
+feature_name: sentiment_poc
+title: Sentiment (Proof of Concept)
+description: >-
+  A spec-only sentiment classifier used to validate that a feature defined solely by
+  a feature.yaml flows end-to-end through the unchanged MRDS platform.
+
+input_fields:
+  - name: text
+    type: string
+
+output_fields:
+  - name: sentiment
+    type: enum
+    values: [positive, negative, neutral]
+
+scoring:
+  - field: sentiment
+    scorer: exact_match
+
+segment_field: sentiment
