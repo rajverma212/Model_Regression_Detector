@@ -71,3 +71,9 @@ else:
 
     st.divider()
     st.write("Open a page from the sidebar: **Runs**, **Trends**, **Regressions**, **Baselines**.")
+
+# Cross-link into the onboarding wizard (the create-a-feature surface).
+st.divider()
+st.caption(
+    "➕ **Onboard a new feature** — run the wizard: `streamlit run src/mrds/onboarding/app.py`"
+)
