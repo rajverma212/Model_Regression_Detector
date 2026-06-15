@@ -110,7 +110,9 @@ src/mrds/
   db/           SQLite connection, schema.sql, migrations, repository
   config/        Pydantic Settings
   observability/ structured logging
-  dashboard/    Streamlit app + pages
+  dashboard/    Streamlit app + pages (original prototype)
+  api/          HTTP API (FastAPI) backing the web frontend — feature-agnostic, presentation only
+web/            Next.js "Evaluation OS" frontend — the primary product surface (see docs/web-frontend.md)
 prompts/        versioned prompt YAML (prompts/<feature>/vN.yaml)
 datasets/       versioned golden JSON (datasets/<feature>/vN.json + .meta.json)
 config/         settings.yaml, thresholds.yaml (committed, non-secret)

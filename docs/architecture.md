@@ -84,6 +84,11 @@ model-regression-detector/
 ├── data/
 │   └── eval.db                     # SQLite system of record (git-ignored)
 │
+├── web/                            # Next.js frontend — the "Evaluation OS" product UI
+│   ├── app/                        # App Router (Mission Control, feature workspace, create)
+│   ├── components/                 # Design-system primitives + views
+│   └── lib/api.ts                  # Typed client mirroring src/mrds/api/serializers.py
+│
 ├── src/
 │   └── mrds/                       # Top-level package
 │       │
@@ -97,6 +102,11 @@ model-regression-detector/
 │       │       ├── compare.py         # `compare`
 │       │       ├── report.py          # `report`
 │       │       └── promote_baseline.py# `promote-baseline`
+│       │
+│       ├── api/                    # HTTP API (FastAPI) — backs the web frontend
+│       │   ├── app.py             # Feature-agnostic routes (per-request DB session)
+│       │   ├── runtime.py         # ApiSession: one SQLite connection per request
+│       │   └── serializers.py     # JSON wire contract (verdicts, deltas, explained cases)
 │       │
 │       ├── core/                   # Shared primitives, feature-agnostic
 │       │   ├── __init__.py
@@ -666,6 +676,13 @@ Common conventions: machine-readable output (JSON) available for CI parsing, str
 | **Baselines** | View current active baseline per feature and promotion history. |
 
 The dashboard is a **read/inspection surface**; mutations (promotion, evaluation) happen through the CLI to keep one authoritative write path. (Baseline promotion *from* the dashboard, if added later, would call the same CLI/repository code path.)
+
+> The Streamlit dashboard is now the **original prototype**. The primary product surface is
+> the **Evaluation OS** web app (`web/`), backed by a thin FastAPI layer (`src/mrds/api/`).
+> Both are feature-agnostic presentation layers over the same read-only data seam; the API
+> additionally exposes guarded baseline promotion (via `BaselinePromoter`, same write path).
+> See **[web-frontend.md](web-frontend.md)** for the API contract, information architecture,
+> and design system.
 
 ---
 

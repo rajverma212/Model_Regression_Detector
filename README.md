@@ -3,7 +3,14 @@
 > **An AI evaluation platform and deployment-safety system for LLM-powered features.**
 > MRDS continuously tests AI features against versioned "golden" datasets, scores them, compares every candidate against a promoted baseline, detects quality **regressions**, generates reports, sends Slack alerts, and **blocks deployments when quality drops** — the same way unit tests and CI block buggy code from shipping.
 
-🔗 **Live dashboard:** [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
+> **🛰️ New: the Evaluation OS web app.** The primary product surface is now a premium
+> Next.js frontend (`web/`) backed by a thin HTTP API (`src/mrds/api/`) over the unchanged
+> engine — fleet health, verdict-first run analysis with per-case failure explanations,
+> root-cause drilldowns, and in-UI baseline promotion. See
+> [docs/web-frontend.md](docs/web-frontend.md). The Streamlit dashboard remains as the
+> original prototype.
+
+🔗 **Live dashboard:** [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
 
 ---
 
@@ -263,8 +270,8 @@ docs/             architecture.md
 # 1. Create and activate a virtual environment
 python3.11 -m venv .venv && source .venv/bin/activate
 
-# 2. Install the package (editable) with dev tooling, plus the dashboard
-pip install -e ".[dev,dashboard]"
+# 2. Install the package (editable) with dev tooling, the dashboard, and the API
+pip install -e ".[dev,dashboard,api]"
 
 # 3. Configure your environment
 cp .env.example .env        # then fill in OPENAI_API_KEY (and SLACK_WEBHOOK_URL if desired)
@@ -282,7 +289,15 @@ ruff format --check .
 pytest -q
 ```
 
-**Run the dashboard locally** (offline demo data, no API key needed):
+**Run the Evaluation OS web app** (the primary surface — offline demo data, no API key needed):
+
+```bash
+python -m mrds.demo            # one-time: seed data/eval.db with a realistic history
+python -m mrds.api             # data plane → http://127.0.0.1:8000  (or: mrds-api)
+cd web && npm install && npm run dev   # product → http://localhost:3000
+```
+
+**Run the Streamlit dashboard** (the original prototype; offline demo data):
 
 ```bash
 MRDS_DEMO=true streamlit run src/mrds/dashboard/app.py
