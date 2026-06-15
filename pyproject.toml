@@ -36,10 +36,19 @@ dev = [
 dashboard = [
     "streamlit>=1.30",
 ]
+# HTTP API (presentation only) — backs the Next.js web frontend. Like the dashboard,
+# it is a thin layer over the feature-agnostic data seam and adds no evaluation logic.
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.9",
+]
 
 [project.scripts]
 # CLI-first: the same entrypoint is used locally and in CI.
 mrds = "mrds.cli.main:main"
+# HTTP API server for the web frontend: `mrds-api` (equivalently `python -m mrds.api`).
+mrds-api = "mrds.api.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mrds"]
@@ -61,6 +70,16 @@ select = [
     "B",   # flake8-bugbear
     "SIM", # flake8-simplify
     "N",   # pep8-naming
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection markers are *meant* to be called in argument
+# defaults (Depends/Query/Path/Body); that is the framework's idiom, not a B008 bug.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
 ]
 
 [tool.ruff.lint.per-file-ignores]
