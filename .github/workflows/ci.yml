@@ -29,7 +29,8 @@ jobs:
           cache: pip
 
       - name: Install package
-        run: pip install -e ".[dev]"
+        # Include the `api` extra so the FastAPI-backed API tests are collected and run.
+        run: pip install -e ".[dev,api]"
 
       - name: Ruff lint
         run: ruff check .

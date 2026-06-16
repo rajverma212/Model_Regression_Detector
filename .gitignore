@@ -32,3 +32,4 @@ reports/
 .DS_Store
 .idea/
 .vscode/
+.vercel
