@@ -1,5 +1,7 @@
 # Eval OS — web frontend
 
+**Live:** https://mrds-web.vercel.app &nbsp;·&nbsp; **API:** https://mrds-api.vercel.app
+
 The product surface for the Model Regression Detection System: an **AI Evaluation
 Operating System**. A premium, dark, instrument-grade interface for managing the health,
 quality, and evolution of every AI feature you ship — built to replace the Streamlit

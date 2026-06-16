@@ -6,7 +6,7 @@ auto-redeploying on every `git push` to `main`:
 | Project | Root directory | What it is | Live URL |
 |---------|----------------|------------|----------|
 | `mrds-web` | `web` | the Next.js UI | **https://mrds-web.vercel.app** ← visit this |
-| `model-regression-detector` | *(repo root)* | FastAPI as a Python serverless function | https://model-regression-detector.vercel.app |
+| `mrds-api` | *(repo root)* | FastAPI as a Python serverless function | https://mrds-api.vercel.app |
 
 The frontend reaches the backend through one environment variable, `MRDS_API_URL`
 (set on the `mrds-web` project to the backend URL).
