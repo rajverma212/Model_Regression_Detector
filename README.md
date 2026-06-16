@@ -10,7 +10,9 @@
 > [docs/web-frontend.md](docs/web-frontend.md). The Streamlit dashboard remains as the
 > original prototype.
 
-🔗 **Live dashboard:** [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
+🚀 **Live app:** [mrds-web.vercel.app](https://mrds-web.vercel.app) &nbsp;•&nbsp; 🔌 **API:** [model-regression-detector.vercel.app/api/health](https://model-regression-detector.vercel.app/api/health)
+
+🔗 **Streamlit prototype:** [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🚢 [Deploy guide](docs/deploy-vercel.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
 
 ---
 
