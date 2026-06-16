@@ -1,0 +1,11 @@
+# Applies to the BACKEND Vercel project (root = repo root), which only needs the
+# Python serverless function and its data. The frontend deploys separately from web/.
+.venv/
+web/
+tests/
+docs/
+reports/
+.github/
+.devcontainer/
+.pytest_cache/
+.ruff_cache/
