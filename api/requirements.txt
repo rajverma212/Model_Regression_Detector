@@ -1,0 +1,9 @@
+# Runtime deps for the Vercel Python serverless function (the MRDS HTTP API).
+# uvicorn/streamlit are intentionally excluded: Vercel provides the ASGI server, and
+# the API never imports the dashboard.
+fastapi>=0.110
+pydantic>=2.6
+pydantic-settings[yaml]>=2.2
+pyyaml>=6.0
+openai>=1.50
+jinja2>=3.1

@@ -20,11 +20,13 @@ env/
 htmlcov/
 
 # --- Generated / runtime artifacts ---
-data/
+data/*
 reports/
 *.db
 *.sqlite
 *.sqlite3
+# Exception: the committed, pre-seeded demo DB bundled into the Vercel function.
+!data/seed.db
 
 # --- OS / editor ---
 .DS_Store
