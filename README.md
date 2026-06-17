@@ -10,9 +10,11 @@
 > [docs/web-frontend.md](docs/web-frontend.md). The Streamlit dashboard remains as the
 > original prototype.
 
-🚀 **Live app:** [mrds-web.vercel.app](https://mrds-web.vercel.app) &nbsp;•&nbsp; 🔌 **API:** [mrds-api.vercel.app/api/health](https://mrds-api.vercel.app/api/health)
+### 🚀 Live app → **[mrds-web.vercel.app](https://mrds-web.vercel.app)**
 
-🔗 **Streamlit prototype:** [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🚢 [Deploy guide](docs/deploy-vercel.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
+🔌 **API:** [health check](https://mrds-api.vercel.app/api/health) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🚢 [Deploy guide](docs/deploy-vercel.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
+
+<sub>The original Streamlit dashboard — the prototype this product grew out of — is archived at [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app).</sub>
 
 ---
 
@@ -101,7 +103,7 @@ flowchart TD
     DET --> ALERT
     PROMO --> ALERT
     REP --> DB
-    DB --> DASH["Streamlit Dashboard (read-only)"]
+    DB --> DASH["Web App · Next.js + FastAPI<br/>(+ Streamlit prototype)"]
 ```
 
 **Key principles enforced by the design:**
@@ -123,7 +125,7 @@ flowchart TD
 - 📝 **Versioned, immutable prompts & datasets** — identified by content hash for full reproducibility.
 - 📄 **Markdown reports** rendered with Jinja2, saved per run and uploaded as CI artifacts.
 - 🔔 **Slack alerting** on regressions and promotions — best-effort and non-blocking.
-- 📈 **Read-only Streamlit dashboard** over runs, trends, regressions, and baselines.
+- 🖥️ **Evaluation OS web app** *(the primary product surface)* — a premium **Next.js** frontend on **Vercel**, over a feature-agnostic **FastAPI** layer: fleet health, verdict-first run analysis with per-case failure explanations, root-cause drilldowns, trends, run comparison, a dataset explorer, and in-UI baseline promotion. *(The original read-only Streamlit dashboard remains as a prototype.)*
 - 🧰 **Cost-aware by default** — `temperature=0`, deterministic scorers for gating, LLM-as-judge **off in CI**, smoke subsets on PRs and full datasets nightly.
 - ✅ **Fully testable** — the OpenAI API is **always mocked** in tests; metrics and thresholds are pure functions; tests assert exact metrics and exact CLI exit codes.
 
@@ -160,11 +162,11 @@ mrds promote-baseline --run <run-id> --promoted-by you --note "v2 prompt looks g
 
 ---
 
-## 7. Dashboard Overview
+## 7. The Web App — "Evaluation OS"
 
-A **read-only** [Streamlit](https://streamlit.io) app that reads straight from the SQLite system of record — it never writes during normal operation. A home overview plus six pages:
+The primary surface is a premium **Next.js** app (React + TypeScript + Tailwind, deployed on **Vercel**) backed by a thin, feature-agnostic **FastAPI** layer over the same engine — see [docs/web-frontend.md](docs/web-frontend.md). It's organized as **Mission Control → feature workspace**: a fleet view of every AI feature's health, then a per-feature workspace with the views below. *(The original read-only Streamlit prototype mirrors the same set.)*
 
-- **Home** — a business-framed overview of each feature under test (what it does, what its categories mean) and a live **health verdict** (🟢 Healthy / 🟡 Warning / 🔴 Blocked) for its latest run, with headline stats.
+- **Mission Control** — the fleet: each feature's live **health verdict** (🟢 Healthy / 🟡 Warning / 🔴 Blocked), latest pass rate vs. baseline, a trend sparkline, and flagged-run count — managing the health of every AI feature at a glance.
 - **Runs** — every evaluation run with its prompt/dataset/model, pass rate, latency, tokens, and status, plus a **test-log explorer**: filter/search every case and expand it to see the model's actual output vs. what was expected and the per-check reason it passed or failed.
 - **Trends** — metric history over time per feature, to see quality drift at a glance.
 - **Compare** — put any two runs side by side and see exactly what changed: headline deltas, per-metric Δ%, the plain-English reason for each move, and whether the prompt or dataset changed between them.
@@ -174,7 +176,7 @@ A **read-only** [Streamlit](https://streamlit.io) app that reads straight from t
 
 Runs are shown with **human-readable names** (e.g. *Email Classifier #12 · gpt-4o-mini · Dataset v1 · Jun 2, 2026*) throughout tables, pickers, and charts, while the internal run id is preserved for traceability.
 
-The dashboard is hardened for public hosting: it degrades gracefully and falls back safely if optional configuration is missing.
+Both surfaces are hardened for public hosting: they degrade gracefully and fall back safely if optional configuration is missing.
 
 ---
 
@@ -226,7 +228,9 @@ Set `MRDS_DEMO=true`. On first load with an empty database, the dashboard seeds 
 | Prompt versioning | **YAML** files |
 | Datasets | **JSON** files |
 | Reports / templating | **Jinja2** |
-| Dashboard | **Streamlit** |
+| Web frontend | **Next.js** (React, TypeScript, Tailwind) — deployed on **Vercel** |
+| Web API | **FastAPI** (feature-agnostic, over the same engine) |
+| Dashboard (prototype) | **Streamlit** |
 | CI/CD | **GitHub Actions** |
 | Alerts | **Slack** incoming webhooks |
 | Testing | **pytest** (OpenAI always mocked) |
@@ -252,8 +256,10 @@ src/mrds/
   config/         layered Pydantic settings
   observability/  structured logging
   demo/           deterministic offline demo seeding
-  dashboard/      Streamlit app + pages (Runs, Trends, Compare, Regressions, Baselines, Dataset)
+  api/            feature-agnostic HTTP API (FastAPI) backing the web frontend
+  dashboard/      Streamlit app + pages (original prototype)
 
+web/              Next.js "Evaluation OS" frontend — the primary product surface (Vercel)
 prompts/          versioned prompt YAML        →  prompts/email_classifier/v1.yaml
 datasets/         versioned golden JSON        →  datasets/email_classifier/v1.json
 config/           settings.yaml (committed, non-secret)
@@ -315,9 +321,11 @@ Secrets (`OPENAI_API_KEY`, `SLACK_WEBHOOK_URL`) come from the environment only a
 
 ---
 
-## 14. Streamlit Dashboard Link
+## 14. Live App
 
-▶️ **[modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app)**
+▶️ **[mrds-web.vercel.app](https://mrds-web.vercel.app)** — the Evaluation OS web app (Next.js + FastAPI, on Vercel).
+
+<sub>Original Streamlit prototype (archived): [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app).</sub>
 
 The hosted dashboard runs in **demo mode** — deterministic, offline-seeded data that walks through baseline runs, a detected regression, and a baseline promotion, so you can explore the whole platform without an API key.
 
