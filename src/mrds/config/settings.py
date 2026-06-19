@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     # --- Persistence (path only; the DB layer is implemented in a later sprint)
     database_path: Path = Path("data/eval.db")
 
+    # --- Platform root: the writable directory holding specs/, prompts/, datasets/.
+    # Feature activation installs new bundles here and the engine reads them back, so
+    # it must be writable and equal to the process working directory. Defaults to the
+    # current directory (durable locally / on any persistent host); a read-only
+    # serverless filesystem must point this at a writable location.
+    platform_root: Path = Path(".")
+
     # --- Model defaults (no API client implemented yet) ------------------------
     model: str = "gpt-4o-mini"
     judge_enabled: bool = False

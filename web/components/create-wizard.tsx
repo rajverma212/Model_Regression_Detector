@@ -13,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { activateFeature, type ActivationResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/status";
 
@@ -58,6 +59,8 @@ export function CreateWizard() {
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [activated, setActivated] = useState<ActivationResult | null>(null);
 
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
@@ -96,6 +99,26 @@ export function CreateWizard() {
       setError("Inference request failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function activate() {
+    const cases = parseCases();
+    if (!cases) return;
+    setError(null);
+    setActivating(true);
+    try {
+      const result = await activateFeature({
+        feature_name: slug,
+        feature_type: type,
+        cases,
+        system_prompt: prompt,
+      });
+      setActivated(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Activation failed.");
+    } finally {
+      setActivating(false);
     }
   }
 
@@ -219,20 +242,18 @@ export function CreateWizard() {
           </Panel>
         )}
 
-        {step === 4 && spec && (
+        {step === 4 && spec && !activated && (
           <Panel title="Ready to activate" sub="">
             <div className="flex items-start gap-4 rounded-xl border border-healthy/25 bg-healthy/[0.05] p-5">
               <CircleCheck className="mt-0.5 shrink-0 text-healthy" size={22} />
               <div>
                 <p className="text-[15px] font-medium text-bright">{slug} is defined and validated.</p>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
-                  Activation writes the feature bundle into the platform and runs its first evaluation —
-                  after which <span className="text-text">{slug}</span> appears in Mission Control with a
-                  baseline of its own. Activation is deliberate (it calls the model), so it runs from the CLI:
+                  Activation writes the feature bundle into the platform, registers it, runs its first
+                  evaluation, and promotes the result as a baseline — after which{" "}
+                  <span className="text-text">{slug}</span> appears in Mission Control. This calls the
+                  model, so it can take a moment.
                 </p>
-                <pre className="mt-3 overflow-x-auto rounded-lg border border-line bg-ink-2 px-3 py-2.5 font-mono text-[12px] text-signal">
-                  mrds evaluate --feature {slug}
-                </pre>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3">
@@ -241,9 +262,47 @@ export function CreateWizard() {
               <Summary k="Segment" v={spec.segment_field ?? "—"} />
             </div>
             <div className="mt-6 flex gap-3">
-              <Button asChild variant="signal">
+              <Button variant="signal" disabled={activating} onClick={activate}>
+                {activating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {activating ? "Activating…" : "Activate feature"}
+              </Button>
+              <Button asChild variant="ghost">
                 <Link href="/">
-                  <ArrowLeft size={15} /> Back to Mission Control
+                  <ArrowLeft size={15} /> Cancel
+                </Link>
+              </Button>
+            </div>
+          </Panel>
+        )}
+
+        {step === 4 && activated && (
+          <Panel title="Activated" sub="">
+            <div className="flex items-start gap-4 rounded-xl border border-healthy/25 bg-healthy/[0.05] p-5">
+              <CircleCheck className="mt-0.5 shrink-0 text-healthy" size={22} />
+              <div>
+                <p className="text-[15px] font-medium text-bright">
+                  {activated.feature} is live in Mission Control.
+                </p>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
+                  First evaluation complete and promoted as the baseline.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-4 gap-3">
+              <Summary k="Cases" v={String(activated.summary.total_cases)} />
+              <Summary k="Passed" v={String(activated.summary.passed)} />
+              <Summary k="Failed" v={String(activated.summary.failed)} />
+              <Summary k="Pass rate" v={`${Math.round(activated.summary.pass_rate * 100)}%`} />
+            </div>
+            <div className="mt-6 flex gap-3">
+              <Button asChild variant="signal">
+                <Link href={`/features/${activated.feature}`}>
+                  Open {activated.feature} <ArrowRight size={15} />
+                </Link>
+              </Button>
+              <Button asChild variant="ghost">
+                <Link href="/">
+                  <ArrowLeft size={15} /> Mission Control
                 </Link>
               </Button>
             </div>

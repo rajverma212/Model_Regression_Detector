@@ -50,11 +50,25 @@ It adds **no evaluation logic**; every endpoint reuses the read-only `DashboardD
 | GET | `/api/runs/{uuid}/regressions` | root cause: regressed metric → contributing cases |
 | GET | `/api/compare?a=&b=` | run-vs-run diff |
 | POST | `/api/onboarding/infer` | infer a feature spec + scaffold a prompt from a dataset |
+| POST | `/api/onboarding/activate` | **end-to-end activation**: persist → install → register → evaluate → baseline |
 
 **Promotion stays honest.** `POST .../promote` runs `BaselinePromoter.check`; a run with a
 critical regression returns `promoted: false` + reasons (HTTP 200, no mutation) unless
 `force: true` — preserving the platform's "never silently overwrite with a worse run" rule,
 now surfaced in the UI as an explicit "promote anyway".
+
+**Activation is the create flow's last mile.** `POST /api/onboarding/activate` stitches the
+existing onboarding/activation/evaluation cores together without adding any evaluation or
+persistence logic: it re-infers the spec from the labeled cases, `write_feature_bundle`,
+`activate_bundle` (install + register), `run_first_evaluation` (unchanged engine → store),
+then `promote_baseline` for the initial baseline. It returns `{feature, run_id, baseline_id,
+summary}`; because step 4 persists a run, the feature appears in Mission Control immediately
+(the fleet lists features with ≥1 recorded run). Two injectable seams keep it production-correct
+and offline-testable: `get_platform_root` (the writable `settings.platform_root`, where bundles
+install and the engine reads them — must equal the process working directory) and `get_llm_client`
+(real OpenAI in production; a deterministic stub in tests). Activation needs `OPENAI_API_KEY` and
+a writable `platform_root`; it is durable locally / on any persistent host. On the read-only,
+ephemeral-`/tmp` serverless deployment it is demo-grade (writes reset on a cold start).
 
 Run it with `python -m mrds.api` (or the `mrds-api` script). Covered by
 `tests/unit/test_api.py` (TestClient over a seeded temp DB; OpenAI never called).

@@ -680,7 +680,13 @@ The dashboard is a **read/inspection surface**; mutations (promotion, evaluation
 > The Streamlit dashboard is now the **original prototype**. The primary product surface is
 > the **Evaluation OS** web app (`web/`), backed by a thin FastAPI layer (`src/mrds/api/`).
 > Both are feature-agnostic presentation layers over the same read-only data seam; the API
-> additionally exposes guarded baseline promotion (via `BaselinePromoter`, same write path).
+> additionally exposes guarded baseline promotion (via `BaselinePromoter`, same write path)
+> and **end-to-end feature activation** (`POST /api/onboarding/activate`), which orchestrates
+> the existing onboarding/activation/evaluation cores — `write_feature_bundle` →
+> `activate_bundle` (install + register) → `run_first_evaluation` (unchanged engine → store)
+> → `promote_baseline` — adding no new evaluation or persistence logic. It installs bundles
+> under the writable `settings.platform_root` (which must equal the working directory) and
+> needs `OPENAI_API_KEY`; durable locally, demo-grade on the read-only serverless deployment.
 > See **[web-frontend.md](web-frontend.md)** for the API contract, information architecture,
 > and design system.
 

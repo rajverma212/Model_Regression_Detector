@@ -13,14 +13,18 @@ FastAPI's threadpool is unsafe. Run it with ``python -m mrds.api``.
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Iterator
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from mrds.activation import ActivationError
+from mrds.activation.lifecycle import activate_bundle, run_first_evaluation
 from mrds.api.runtime import ApiSession
 from mrds.api.serializers import (
     health_from_records,
@@ -35,6 +39,7 @@ from mrds.api.serializers import (
     serialize_run_summary,
     serialize_trend_point,
 )
+from mrds.config.settings import get_settings
 from mrds.dashboard.data import (
     DashboardData,
     cases_for_metric,
@@ -42,6 +47,9 @@ from mrds.dashboard.data import (
 )
 from mrds.db.records import BaselineRecord
 from mrds.evaluation.models import AggregateMetrics
+from mrds.llm.base import StructuredLLMClient
+from mrds.llm.errors import LLMConfigurationError
+from mrds.onboarding import write_feature_bundle
 from mrds.onboarding.errors import OnboardingError
 from mrds.onboarding.inference import infer_feature_spec
 from mrds.onboarding.scaffold import scaffold_prompt
@@ -56,6 +64,20 @@ def get_session() -> Iterator[ApiSession]:
         yield session
     finally:
         session.close()
+
+
+def get_platform_root() -> Path:
+    """FastAPI dependency: the writable root where activated bundles are installed."""
+    return Path(get_settings().platform_root)
+
+
+def get_llm_client() -> StructuredLLMClient | None:
+    """FastAPI dependency: the evaluation LLM client.
+
+    ``None`` defers to the real, settings-configured OpenAI client at run time; tests
+    override this to inject a deterministic offline stub.
+    """
+    return None
 
 
 def create_app() -> FastAPI:
@@ -208,6 +230,13 @@ class InferRequest(BaseModel):
     feature_name: str
     feature_type: str = "classification"
     cases: list[dict[str, Any]]
+
+
+class ActivateRequest(BaseModel):
+    feature_name: str
+    feature_type: str = "classification"
+    cases: list[dict[str, Any]]
+    system_prompt: str
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +451,69 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
         except OnboardingError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"spec": spec.model_dump(mode="json"), "prompt": prompt}
+
+    @app.post("/api/onboarding/activate")
+    def onboarding_activate(
+        body: ActivateRequest,
+        session: ApiSession = Depends(get_session),
+        platform_root: Path = Depends(get_platform_root),
+        client: StructuredLLMClient | None = Depends(get_llm_client),
+    ) -> dict[str, Any]:
+        """Activate an onboarded feature end-to-end: persist → install → register → evaluate.
+
+        Stitches the existing onboarding/activation/evaluation pieces together (it adds no
+        evaluation or persistence logic of its own): re-infers the spec from the labeled
+        cases, writes a bundle, installs and registers it under ``platform_root``, runs the
+        first evaluation through the unchanged engine, persists it via the store, and
+        promotes the result as the initial baseline. After this returns, the feature has a
+        persisted run and so appears in Mission Control immediately.
+        """
+        try:
+            spec = infer_feature_spec(
+                {"cases": body.cases},
+                feature_name=body.feature_name,
+                feature_type=body.feature_type,
+            )
+            # Stage the bundle in a throwaway dir, then install it into the platform root;
+            # install refuses to overwrite, so an already-activated name surfaces as a 400.
+            with tempfile.TemporaryDirectory(prefix="mrds_onboard_") as staging:
+                paths = write_feature_bundle(
+                    spec,
+                    cases=body.cases,
+                    system_prompt=body.system_prompt,
+                    root=staging,
+                )
+                installed = activate_bundle(paths.bundle_dir, root=platform_root)
+            result = run_first_evaluation(
+                installed,
+                root=platform_root,
+                store=session.store,
+                client=client,
+                triggered_by="onboarding",
+            )
+        except (OnboardingError, ActivationError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except LLMConfigurationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        # First run for the feature — nothing to regress against — so promote directly
+        # through the store (no BaselinePromoter eligibility gate applies to a first baseline).
+        baseline = session.store.promote_baseline(
+            result.run_id, promoted_by="onboarding", note="Initial baseline"
+        )
+        metrics = result.aggregate_metrics
+        return {
+            "feature": result.feature,
+            "run_id": result.run_id,
+            "baseline_id": baseline.id,
+            "summary": {
+                "total_cases": metrics.total_cases,
+                "passed": metrics.passed,
+                "failed": metrics.failed,
+                "errored": metrics.errored,
+                "pass_rate": metrics.pass_rate,
+            },
+        }
 
 
 app = create_app()

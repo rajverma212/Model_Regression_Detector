@@ -279,6 +279,38 @@ export async function getFeatures(): Promise<FeatureOverview[]> {
   }
 }
 
+export interface ActivationResult {
+  feature: string;
+  run_id: string;
+  baseline_id: number;
+  summary: {
+    total_cases: number;
+    passed: number;
+    failed: number;
+    errored: number;
+    pass_rate: number;
+  };
+}
+
+export interface ActivateRequest {
+  feature_name: string;
+  feature_type: string;
+  cases: unknown[];
+  system_prompt: string;
+}
+
+/** Activate an onboarded feature end-to-end (install → register → evaluate → baseline). */
+export async function activateFeature(body: ActivateRequest): Promise<ActivationResult> {
+  const res = await fetch("/api/onboarding/activate", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? "Activation failed.");
+  return data as ActivationResult;
+}
+
 export const getFeature = (f: string) => serverGet<FeatureOverview>(`/api/features/${f}`);
 export const getRuns = (f: string) => serverGet<RunSummary[]>(`/api/features/${f}/runs`);
 export const getTrend = (f: string) => serverGet<TrendPoint[]>(`/api/features/${f}/trend`);

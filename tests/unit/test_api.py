@@ -16,10 +16,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from mrds.api.app import create_app, get_session
+from mrds.api.app import create_app, get_llm_client, get_platform_root, get_session
 from mrds.api.runtime import ApiSession
 from mrds.db import EvaluationStore, open_database
 from mrds.demo import seed_demo
+from mrds.llm.base import LLMMessage, LLMResult
 
 
 @pytest.fixture(scope="session")
@@ -218,3 +219,111 @@ def test_dataset_explorer_payload(client: TestClient) -> None:
     assert data["segment_field"] == "category"
     assert data["coverage"]["by_category"]
     assert all("expected" in c for c in data["cases"])
+
+
+# --- End-to-end activation -----------------------------------------------------
+
+
+def _case(case_id: str, text: str, category: str) -> dict[str, object]:
+    return {"id": case_id, "input": {"text": text}, "expected_output": {"category": category}}
+
+
+_ACTIVATE_CASES = [
+    _case("a1", "please refund my charge", "billing"),
+    _case("a2", "send me an invoice", "billing"),
+    _case("a3", "the app crashes on launch", "technical"),
+    _case("a4", "error on the login page", "technical"),
+    _case("a5", "reset my password", "account"),
+    _case("a6", "change my email address", "account"),
+]
+_ORACLE = {c["input"]["text"]: c["expected_output"]["category"] for c in _ACTIVATE_CASES}
+
+
+class _ActivateStub:
+    """Deterministic offline LLM: returns the labeled category for each known input."""
+
+    def parse_structured(self, *, model: str, messages, schema):  # type: ignore[no-untyped-def]
+        last = messages[-1]
+        text = last.content if isinstance(last, LLMMessage) else last["content"]
+        label = _ORACLE.get(text, "billing")
+        return LLMResult(
+            parsed=schema.model_validate({"category": label}),
+            model=model,
+            input_tokens=6,
+            output_tokens=2,
+            total_tokens=8,
+        )
+
+
+@pytest.fixture
+def activation_client(tmp_path: Path) -> Iterator[TestClient]:
+    """A TestClient with an empty DB, a writable platform root, and a stub LLM."""
+    db_path = tmp_path / "eval.db"
+    open_database(db_path).close()  # bootstrap schema on an empty DB
+    platform_root = tmp_path / "platform"
+    platform_root.mkdir()
+
+    app = create_app()
+
+    def _session() -> Iterator[ApiSession]:
+        session = ApiSession(db_path)
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_session] = _session
+    app.dependency_overrides[get_platform_root] = lambda: platform_root
+    app.dependency_overrides[get_llm_client] = lambda: _ActivateStub()
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_activate_is_end_to_end_and_appears_in_mission_control(
+    activation_client: TestClient,
+) -> None:
+    assert activation_client.get("/api/features").json() == []  # nothing onboarded yet
+
+    resp = activation_client.post(
+        "/api/onboarding/activate",
+        json={
+            "feature_name": "support_activate",
+            "feature_type": "classification",
+            "cases": _ACTIVATE_CASES,
+            "system_prompt": "Classify the support message into one category. Respond as JSON.",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    # Success response carries the contract the wizard needs.
+    assert body["feature"] == "support_activate"
+    assert body["run_id"]
+    assert isinstance(body["baseline_id"], int)
+    summary = body["summary"]
+    assert summary["total_cases"] == 6
+    assert 0.0 <= summary["pass_rate"] <= 1.0
+
+    # Mission Control shows the feature immediately, with the promoted baseline.
+    fleet = activation_client.get("/api/features").json()
+    assert [f["feature"] for f in fleet] == ["support_activate"]
+    overview = activation_client.get("/api/features/support_activate").json()
+    assert overview["has_baseline"] is True
+    assert overview["run_count"] == 1
+
+    baseline = activation_client.get("/api/features/support_activate/baseline").json()
+    assert baseline["active"]["id"] == body["baseline_id"]
+    assert baseline["active"]["run_uuid"] == body["run_id"]
+
+
+def test_activate_rejects_duplicate_feature(activation_client: TestClient) -> None:
+    payload = {
+        "feature_name": "support_activate",
+        "feature_type": "classification",
+        "cases": _ACTIVATE_CASES,
+        "system_prompt": "Classify the support message. Respond as JSON.",
+    }
+    assert activation_client.post("/api/onboarding/activate", json=payload).status_code == 200
+    dup = activation_client.post("/api/onboarding/activate", json=payload)
+    assert dup.status_code == 400
+    assert "already" in dup.json()["detail"].lower()
