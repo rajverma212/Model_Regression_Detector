@@ -34,7 +34,7 @@ The **Customer Support Email Classifier** is only the **first feature under test
 - **Ruff** is the linter and formatter. Code must be Ruff-clean before completion. Do not hand-format against it.
 - **Pydantic v2** for all domain models, I/O schemas, and `Settings`. Use v2 idioms (`model_validate`, `model_dump`, `Field`, `field_validator`) — not v1.
 - **Small, single-responsibility modules** matching the architecture layout. Don't put feature logic in core modules.
-- **No secrets in code or committed files.** `OPENAI_API_KEY` and `SLACK_WEBHOOK_URL` come from environment/CI secrets; document them in `.env.example`.
+- **No secrets in code or committed files.** `ANTHROPIC_API_KEY` and `SLACK_WEBHOOK_URL` come from environment/CI secrets; document them in `.env.example`.
 - **Explicit errors.** Fail fast with clear messages on invalid config, schema violations, or missing baselines.
 - **Pure functions for metrics/thresholds** — no I/O inside `metrics.py` / `thresholds.py` so they're trivially testable.
 
@@ -51,7 +51,7 @@ The **Customer Support Email Classifier** is only the **first feature under test
 
 ## 5. Testing Standards
 
-- **pytest** is the test framework. **The OpenAI API is always mocked** — never make real network/model calls in tests (no cost, deterministic).
+- **pytest** is the test framework. **The Anthropic API is always mocked** — never make real network/model calls in tests (no cost, deterministic).
 - Recorded/stub responses and sample prompts/datasets live in `tests/fixtures/`; shared fixtures (temp SQLite DB, mocked client, seeded baseline) in `tests/conftest.py`.
 - **Unit tests** for: metrics math, regression/threshold logic, hashing, registry, config loading, report rendering, Slack message building, repository CRUD.
 - **Integration tests** for: full `evaluate → compare → report` flow, baseline promotion, and the critical-regression exit code.
@@ -78,7 +78,7 @@ Use these; do not introduce alternatives without reason.
 | Concern | Library |
 |---------|---------|
 | Language | Python 3.11 |
-| LLM API | OpenAI API |
+| LLM API | Anthropic API (Claude) |
 | Models / validation / settings | Pydantic v2 |
 | Persistence | SQLite (stdlib `sqlite3`) |
 | Prompt versioning | YAML files |
@@ -134,7 +134,7 @@ Conventions:
 
 - **Follow the roadmap.** Build in sprint order ([docs/roadmap.md](docs/roadmap.md)); each sprint must leave the system working and tested. Do not jump ahead unless asked.
 - **Respect the boundaries.** Never leak feature-specific logic into core modules; never import optional eval libs outside their adapters.
-- **No real API calls in tests.** Always mock OpenAI.
+- **No real API calls in tests.** Always mock Anthropic.
 - **Keep the gate honest.** `compare`'s exit code is the merge gate — guard it with tests.
 - Before finishing any task: full type hints, Ruff clean, pytest green, docstrings present, and architecture.md/README updated if design or usage changed.
 

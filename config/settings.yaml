@@ -3,7 +3,7 @@
 # These values are committed and form the middle layer of configuration:
 #   defaults (in code) < this file < environment variables / .env
 #
-# Secrets (OPENAI_API_KEY, SLACK_WEBHOOK_URL) are NEVER stored here — they come
+# Secrets (ANTHROPIC_API_KEY, SLACK_WEBHOOK_URL) are NEVER stored here — they come
 # from the environment only. See .env.example.
 
 env: local
@@ -12,5 +12,5 @@ json_logs: false
 
 database_path: data/eval.db
 
-model: gpt-4o-mini
+model: claude-haiku-4-5
 judge_enabled: false

@@ -66,12 +66,21 @@ summary}`; because step 4 persists a run, the feature appears in Mission Control
 (the fleet lists features with ≥1 recorded run). Two injectable seams keep it production-correct
 and offline-testable: `get_platform_root` (the writable `settings.platform_root`, where bundles
 install and the engine reads them — must equal the process working directory) and `get_llm_client`
-(real OpenAI in production; a deterministic stub in tests). Activation needs `OPENAI_API_KEY` and
-a writable `platform_root`; it is durable locally / on any persistent host. On the read-only,
-ephemeral-`/tmp` serverless deployment it is demo-grade (writes reset on a cold start).
+(the real Anthropic client in production; a deterministic stub in tests).
+
+It also **fails closed and honestly** (no fabricated baselines, no opaque 500s):
+- no `ANTHROPIC_API_KEY` configured → `422` *before* anything is written (the first evaluation
+  can't run, so no all-errored 0% baseline is created);
+- a non-writable `platform_root` (e.g. a read-only serverless filesystem) → `503` with a clear
+  JSON message naming the unwritable path, never a plain-text `Internal Server Error`.
+
+Activation needs `ANTHROPIC_API_KEY` and a writable `platform_root`; it is durable locally / on
+any persistent host. On the read-only serverless deployment the entrypoint redirects the platform
+root to a writable `/tmp` working dir (see `docs/deploy-vercel.md`), so it works **within a warm
+instance** but is ephemeral (writes reset on a cold start).
 
 Run it with `python -m mrds.api` (or the `mrds-api` script). Covered by
-`tests/unit/test_api.py` (TestClient over a seeded temp DB; OpenAI never called).
+`tests/unit/test_api.py` (TestClient over a seeded temp DB; the model is never called).
 
 ## 3. The frontend (`web/`)
 

@@ -74,7 +74,7 @@ def get_platform_root() -> Path:
 def get_llm_client() -> StructuredLLMClient | None:
     """FastAPI dependency: the evaluation LLM client.
 
-    ``None`` defers to the real, settings-configured OpenAI client at run time; tests
+    ``None`` defers to the real, settings-configured Anthropic client at run time; tests
     override this to inject a deterministic offline stub.
     """
     return None
@@ -468,6 +468,16 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
         promotes the result as the initial baseline. After this returns, the feature has a
         persisted run and so appears in Mission Control immediately.
         """
+        # Fail fast (before writing anything) if there's no way to run the evaluation, so we
+        # never fabricate an all-errored 0% baseline. Only relevant when no client is injected.
+        if client is None and not get_settings().anthropic_api_key:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "ANTHROPIC_API_KEY is not configured, so the first evaluation cannot run. "
+                    "Set it on the server and retry activation."
+                ),
+            )
         try:
             spec = infer_feature_spec(
                 {"cases": body.cases},
@@ -495,6 +505,16 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except OSError as exc:
+            # The platform root is not writable (e.g. a read-only serverless filesystem).
+            # Surface a clear JSON error instead of an opaque plain-text 500.
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Cannot persist the feature bundle: storage at '{platform_root}' is not "
+                    f"writable ({exc}). Configure MRDS_PLATFORM_ROOT to a writable directory."
+                ),
+            ) from exc
 
         # First run for the feature — nothing to regress against — so promote directly
         # through the store (no BaselinePromoter eligibility gate applies to a first baseline).

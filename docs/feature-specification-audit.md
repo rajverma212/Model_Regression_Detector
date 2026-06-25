@@ -108,7 +108,7 @@ routing, extraction, screening). Free-text/graded features need the judge seam f
 | `feature_name` | Stable id used by the registry, DB, CLI, dashboard. | **Yes** | `ticket_router` |
 | `title` / `description` | Human/business framing for the dashboard (today's `FEATURE_INFO`). | No (falls back to slug) | `"Support Ticket Router"` |
 | `feature_type` | Picks sensible **defaults** for scoring/segment/pass-rule. | **Yes** | `classification` · `routing` · `extraction` · `screening` · `rag_qa` |
-| `model` | Which LLM to run; reproducibility. | No (defaults to settings) | `gpt-4o-mini` |
+| `model` | Which LLM to run; reproducibility. | No (defaults to settings) | `claude-haiku-4-5` |
 | `input_fields` | Declares the input schema → generated input model + message assembly. | **Yes** (≥1) | `[{name: ticket_text, type: string}]` |
 | `output_fields` | Declares the output schema (incl. enum value sets) → generated output model + the JSON contract the prompt must satisfy. | **Yes** (≥1) | `[{name: category, type: enum, values: [billing, technical_support, account_access, feature_request]}, {name: priority, type: enum, values: [low, medium, high]}]` |
 | `segment_field` | Which output field to break metrics down by. | No | `category` |

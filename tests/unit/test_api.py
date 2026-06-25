@@ -9,6 +9,7 @@ root-cause attribution, the baseline-promotion guard, and onboarding inference.
 
 from __future__ import annotations
 
+import json
 import shutil
 from collections.abc import Iterator
 from pathlib import Path
@@ -276,6 +277,7 @@ def activation_client(tmp_path: Path) -> Iterator[TestClient]:
     app.dependency_overrides[get_platform_root] = lambda: platform_root
     app.dependency_overrides[get_llm_client] = lambda: _ActivateStub()
     with TestClient(app) as test_client:
+        test_client.platform_root = platform_root  # type: ignore[attr-defined]
         yield test_client
 
 
@@ -327,3 +329,123 @@ def test_activate_rejects_duplicate_feature(activation_client: TestClient) -> No
     dup = activation_client.post("/api/onboarding/activate", json=payload)
     assert dup.status_code == 400
     assert "already" in dup.json()["detail"].lower()
+
+
+def test_activate_succeeds_with_another_feature_in_shared_root(
+    activation_client: TestClient,
+) -> None:
+    """Regression test for the dataset-discovery bug: a *different* feature already living
+    in the shared platform root (different schema) must not break a new activation."""
+    # Pre-seed a foreign feature's dataset under the shared root, with a schema that does
+    # NOT match the feature being activated (input `email_text`, not `text`). Before the
+    # fix, run_first_evaluation validated this against the new feature's models → 500.
+    platform_root: Path = activation_client.platform_root  # type: ignore[attr-defined]
+    foreign = platform_root / "datasets" / "email_like"
+    foreign.mkdir(parents=True)
+    (foreign / "v1.json").write_text(
+        json.dumps(
+            {
+                "version": "v1",
+                "created_at": "2026-01-01",
+                "description": "A foreign feature with a different schema.",
+                "cases": [
+                    {
+                        "id": "e1",
+                        "input": {"email_text": "I was charged twice."},
+                        "expected_output": {"category": "billing", "summary": "Double charge."},
+                        "expected_difficulty": "easy",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resp = activation_client.post(
+        "/api/onboarding/activate",
+        json={
+            "feature_name": "support_activate",
+            "feature_type": "classification",
+            "cases": _ACTIVATE_CASES,
+            "system_prompt": "Classify the support message. Respond as JSON.",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["summary"]["total_cases"] == 6
+    assert isinstance(body["baseline_id"], int)
+
+    fleet = activation_client.get("/api/features").json()
+    assert [f["feature"] for f in fleet] == ["support_activate"]
+    overview = activation_client.get("/api/features/support_activate").json()
+    assert overview["has_baseline"] is True
+    assert overview["run_count"] == 1
+
+
+def _activate_app(db_path: Path, platform_root: Path, *, with_client: bool) -> object:
+    """Build an app wired to a temp DB + given platform root (and optional stub LLM)."""
+    app = create_app()
+
+    def _session() -> Iterator[ApiSession]:
+        session = ApiSession(db_path)
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_session] = _session
+    app.dependency_overrides[get_platform_root] = lambda: platform_root
+    if with_client:
+        app.dependency_overrides[get_llm_client] = lambda: _ActivateStub()
+    return app
+
+
+def test_activate_fails_fast_without_llm_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No key + no injected client → a clear 422 *before* anything is persisted."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    db_path = tmp_path / "eval.db"
+    open_database(db_path).close()
+    platform_root = tmp_path / "platform"
+    platform_root.mkdir()
+
+    app = _activate_app(db_path, platform_root, with_client=False)  # real (None) client → no key
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/onboarding/activate",
+            json={
+                "feature_name": "nokey",
+                "feature_type": "classification",
+                "cases": _ACTIVATE_CASES,
+                "system_prompt": "Classify. JSON out.",
+            },
+        )
+    assert resp.status_code == 422
+    assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
+    assert not (platform_root / "specs").exists()  # nothing persisted
+
+
+def test_activate_returns_clear_error_when_root_unwritable(tmp_path: Path) -> None:
+    """A non-writable platform root → a clear JSON 503, not an opaque plain-text 500."""
+    db_path = tmp_path / "eval.db"
+    open_database(db_path).close()
+    # Parent is a *file*, so creating any directory under it raises OSError for everyone
+    # (robust across CI-as-root, unlike chmod).
+    blocker = tmp_path / "not_a_dir"
+    blocker.write_text("x", encoding="utf-8")
+    platform_root = blocker / "sub"
+
+    app = _activate_app(db_path, platform_root, with_client=True)  # stub passes the key check
+    with TestClient(app, raise_server_exceptions=True) as client:
+        resp = client.post(
+            "/api/onboarding/activate",
+            json={
+                "feature_name": "readonly",
+                "feature_type": "classification",
+                "cases": _ACTIVATE_CASES,
+                "system_prompt": "Classify. JSON out.",
+            },
+        )
+    assert resp.status_code == 503
+    assert "not writable" in resp.json()["detail"]

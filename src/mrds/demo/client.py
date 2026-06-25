@@ -1,7 +1,7 @@
 """A deterministic, offline LLM client for demo data generation.
 
 Implements the :class:`~mrds.llm.base.StructuredLLMClient` protocol with no network
-and no OpenAI calls. Classifications come from an *oracle* (the dataset's expected
+and no Anthropic calls. Classifications come from an *oracle* (the dataset's expected
 labels); a deterministic ``wrong_texts`` set is misclassified to control accuracy.
 Token counts scale deterministically, and an optional simulated latency makes the
 dashboard's latency charts non-trivial.

@@ -8,7 +8,7 @@ link into the dashboard).
 Steps 1–5 use the onboarding core (``infer_feature_spec`` / ``scaffold_prompt`` /
 ``write_feature_bundle``); Steps 6–7 use the activation lifecycle (``activate_bundle`` /
 ``run_first_evaluation``). Supports Classification and Routing only. Running an evaluation
-requires ``OPENAI_API_KEY``; without it, Step 7 shows the CLI fallback. See
+requires ``ANTHROPIC_API_KEY``; without it, Step 7 shows the CLI fallback. See
 docs/unified-platform-flow.md.
 
 Run with: ``streamlit run src/mrds/onboarding/app.py``.
@@ -240,10 +240,10 @@ elif state["step"] == 7:
     st.success(f"**{name}** is activated and part of MRDS.")
     st.caption("Score it against its labeled examples to get a first result.")
 
-    has_key = bool(get_settings().openai_api_key)
+    has_key = bool(get_settings().anthropic_api_key)
     if not has_key:
         st.info(
-            "Set `OPENAI_API_KEY` to run the evaluation here, or from a terminal run: "
+            "Set `ANTHROPIC_API_KEY` to run the evaluation here, or from a terminal run: "
             f"`mrds evaluate --feature {name}`"
         )
 

@@ -207,6 +207,59 @@ def test_registry_is_feature_agnostic(tmp_path: Path) -> None:
     assert isinstance(registry.get("rag_qa", "v1").definition.cases[0].input, QAInput)
 
 
+def test_discover_feature_loads_only_that_feature(tmp_path: Path) -> None:
+    """With multiple features of *different* schemas in one root, discover_feature loads
+    only the named one — and never validates the other against the wrong models."""
+
+    class QAInput(BaseModel):
+        question: str
+
+    class QAOutput(BaseModel):
+        answer: str
+
+    # email_classifier (input email_text / output category+summary) and a foreign rag_qa
+    # feature (input question / output answer) coexist under the same root.
+    _write(tmp_path, "v1.json", VALID_DATASET, feature="email_classifier")
+    _write(
+        tmp_path,
+        "v1.json",
+        {
+            "version": "v1",
+            "created_at": "2026-01-01",
+            "description": "rag_qa golden set.",
+            "cases": [
+                {
+                    "id": "q-1",
+                    "input": {"question": "What is MRDS?"},
+                    "expected_output": {"answer": "An evaluation platform."},
+                    "expected_difficulty": "easy",
+                }
+            ],
+        },
+        feature="rag_qa",
+    )
+
+    # A full discover with a single-feature resolver would validate rag_qa's cases against
+    # the QA models and email_classifier's against them too — exactly the activation bug.
+    with pytest.raises(DatasetValidationError):
+        DatasetRegistry.from_directory(tmp_path, model_resolver=lambda _f: (QAInput, QAOutput))
+
+    # Feature-scoped discovery validates *only* rag_qa and ignores the foreign dataset.
+    registry = DatasetRegistry(tmp_path, model_resolver=lambda _f: (QAInput, QAOutput))
+    assert registry.discover_feature("rag_qa") == 1
+    assert registry.features() == ["rag_qa"]
+    assert isinstance(registry.get("rag_qa", "v1").definition.cases[0].input, QAInput)
+
+
+def test_discover_feature_missing_dir_raises(tmp_path: Path) -> None:
+    registry = DatasetRegistry(
+        tmp_path,
+        model_resolver=lambda _f: (EmailClassificationInput, EmailClassificationOutput),
+    )
+    with pytest.raises(DatasetError, match="No dataset directory for feature 'ghost'"):
+        registry.discover_feature("ghost")
+
+
 def test_registry_unknown_lookups_raise(tmp_path: Path) -> None:
     _write(tmp_path, "v1.json", VALID_DATASET)
     registry = DatasetRegistry.from_directory(

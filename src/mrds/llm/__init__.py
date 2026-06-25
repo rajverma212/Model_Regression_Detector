@@ -2,8 +2,8 @@
 
 Features depend only on the :class:`StructuredLLMClient` protocol and the
 provider-neutral :class:`LLMMessage` / :class:`LLMResult` types. The concrete
-OpenAI implementation lives in :mod:`mrds.llm.openai_client` and is the only
-module that imports the ``openai`` SDK.
+Anthropic implementation lives in :mod:`mrds.llm.anthropic_client` and is the only
+module that imports the ``anthropic`` SDK.
 """
 
 from mrds.llm.base import LLMMessage, LLMResult, StructuredLLMClient

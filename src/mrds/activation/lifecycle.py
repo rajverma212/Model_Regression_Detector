@@ -57,10 +57,15 @@ def run_first_evaluation(
     prompts = PromptRegistry.from_directory(root / "prompts")
     feature = build_from_spec(spec, client=client, prompt_registry=prompts)
 
-    datasets = DatasetRegistry.from_directory(
+    # Scope discovery to *this* feature: ``root/datasets`` is the shared datasets root,
+    # so a full ``discover`` would validate every other feature's dataset against this
+    # feature's models (the resolver only knows this one). discover_feature loads only
+    # ``root/datasets/<feature>``.
+    datasets = DatasetRegistry(
         root / "datasets",
         model_resolver=lambda _f: (feature.input_model, feature.output_model),
     )
+    datasets.discover_feature(spec.feature_name)
     registry = FeatureRegistry()
     registry.register(feature)
     engine = EvaluationEngine(features=registry, prompts=prompts, datasets=datasets)

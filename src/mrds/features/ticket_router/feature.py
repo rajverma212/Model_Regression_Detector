@@ -161,14 +161,14 @@ class TicketRouterFeature(Feature):
         if self._client is not None:
             return self._client
         settings = self._resolve_settings()
-        if not settings.openai_api_key:
+        if not settings.anthropic_api_key:
             raise LLMConfigurationError(
-                "OPENAI_API_KEY is not set; cannot run ticket_router against OpenAI."
+                "ANTHROPIC_API_KEY is not set; cannot run ticket_router against Anthropic."
             )
-        # Imported lazily so the openai SDK is only required at real run time.
-        from mrds.llm.openai_client import OpenAIStructuredClient
+        # Imported lazily so the anthropic SDK is only required at real run time.
+        from mrds.llm.anthropic_client import AnthropicStructuredClient
 
-        self._client = OpenAIStructuredClient(api_key=settings.openai_api_key)
+        self._client = AnthropicStructuredClient(api_key=settings.anthropic_api_key)
         return self._client
 
 

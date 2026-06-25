@@ -1,7 +1,7 @@
 """Provider-neutral types and the structured-output client protocol.
 
 Keeping these provider-agnostic means features (and, later, the evaluation
-engine) never import the OpenAI SDK directly — they depend on
+engine) never import the Anthropic SDK directly — they depend on
 :class:`StructuredLLMClient`, which any provider implementation can satisfy and
 any test can fake.
 """

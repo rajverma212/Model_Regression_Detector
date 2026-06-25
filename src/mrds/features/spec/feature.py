@@ -160,13 +160,13 @@ class GenericStructuredFeature(Feature):
         if self._client is not None:
             return self._client
         settings = self._resolve_settings()
-        if not settings.openai_api_key:
+        if not settings.anthropic_api_key:
             raise LLMConfigurationError(
-                f"OPENAI_API_KEY is not set; cannot run {self.name} against OpenAI."
+                f"ANTHROPIC_API_KEY is not set; cannot run {self.name} against Anthropic."
             )
-        from mrds.llm.openai_client import OpenAIStructuredClient
+        from mrds.llm.anthropic_client import AnthropicStructuredClient
 
-        self._client = OpenAIStructuredClient(api_key=settings.openai_api_key)
+        self._client = AnthropicStructuredClient(api_key=settings.anthropic_api_key)
         return self._client
 
 

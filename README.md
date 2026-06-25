@@ -85,7 +85,7 @@ flowchart TD
 
     PROMPTS["prompts/&lt;feature&gt;/vN.yaml"]
     DATA["datasets/&lt;feature&gt;/vN.json"]
-    LLM["OpenAI client<br/>(temperature=0, structured output)"]
+    LLM["Anthropic client<br/>(structured output)"]
 
     CLI --> ENG
     CLI --> DET
@@ -127,7 +127,7 @@ flowchart TD
 - 🔔 **Slack alerting** on regressions and promotions — best-effort and non-blocking.
 - 🖥️ **Evaluation OS web app** *(the primary product surface)* — a premium **Next.js** frontend on **Vercel**, over a feature-agnostic **FastAPI** layer: fleet health, verdict-first run analysis with per-case failure explanations, root-cause drilldowns, trends, run comparison, a dataset explorer, and in-UI baseline promotion. *(The original read-only Streamlit dashboard remains as a prototype.)*
 - 🧰 **Cost-aware by default** — `temperature=0`, deterministic scorers for gating, LLM-as-judge **off in CI**, smoke subsets on PRs and full datasets nightly.
-- ✅ **Fully testable** — the OpenAI API is **always mocked** in tests; metrics and thresholds are pure functions; tests assert exact metrics and exact CLI exit codes.
+- ✅ **Fully testable** — the Anthropic API is **always mocked** in tests; metrics and thresholds are pure functions; tests assert exact metrics and exact CLI exit codes.
 
 ---
 
@@ -174,7 +174,7 @@ The primary surface is a premium **Next.js** app (React + TypeScript + Tailwind,
 - **Baselines** — the currently promoted baseline per feature, plus promotion history (who, when, why).
 - **Dataset** — browse the hand-labeled golden dataset the feature is tested against, with category/difficulty distributions, human notes, and filter/search.
 
-Runs are shown with **human-readable names** (e.g. *Email Classifier #12 · gpt-4o-mini · Dataset v1 · Jun 2, 2026*) throughout tables, pickers, and charts, while the internal run id is preserved for traceability.
+Runs are shown with **human-readable names** (e.g. *Email Classifier #12 · claude-haiku-4-5 · Dataset v1 · Jun 2, 2026*) throughout tables, pickers, and charts, while the internal run id is preserved for traceability.
 
 Both surfaces are hardened for public hosting: they degrade gracefully and fall back safely if optional configuration is missing.
 
@@ -184,7 +184,7 @@ Both surfaces are hardened for public hosting: they degrade gracefully and fall 
 
 Two workflows give the platform its teeth (both pinned to Python 3.11):
 
-**`ci.yml` — fast, secret-free checks** on every push and PR: Ruff lint, Ruff format check, and the full pytest suite (OpenAI is mocked, so it's free and deterministic).
+**`ci.yml` — fast, secret-free checks** on every push and PR: Ruff lint, Ruff format check, and the full pytest suite (Anthropic is mocked, so it's free and deterministic).
 
 **`eval.yml` — the Evaluation Gate** (the deployment-safety mechanism). It triggers when `prompts/`, `datasets/`, `src/mrds/features/`, or `config/` change, plus a **nightly** full run and manual dispatch. It orchestrates *only* the existing CLI — no logic is duplicated in YAML:
 
@@ -211,9 +211,9 @@ Alerting is **best-effort and total**: the Slack client never raises. A missing 
 
 ## 10. Demo Mode
 
-So the public dashboard is meaningful without any OpenAI access, MRDS ships a **deterministic, fully offline demo**.
+So the public dashboard is meaningful without any Anthropic API access, MRDS ships a **deterministic, fully offline demo**.
 
-Set `MRDS_DEMO=true`. On first load with an empty database, the dashboard seeds a realistic narrative — baseline runs, a regression, and a promotion — by driving the **real** pipeline (the actual `EvaluationEngine`, `RegressionDetector`, and `BaselinePromoter`) against an **offline oracle** instead of OpenAI. Nothing is faked or bypassed, so the demo genuinely exercises the platform. Seeding is idempotent (it no-ops if any runs already exist) and never makes a network call.
+Set `MRDS_DEMO=true`. On first load with an empty database, the dashboard seeds a realistic narrative — baseline runs, a regression, and a promotion — by driving the **real** pipeline (the actual `EvaluationEngine`, `RegressionDetector`, and `BaselinePromoter`) against an **offline oracle** instead of Anthropic. Nothing is faked or bypassed, so the demo genuinely exercises the platform. Seeding is idempotent (it no-ops if any runs already exist) and never makes a network call.
 
 ---
 
@@ -223,7 +223,7 @@ Set `MRDS_DEMO=true`. On first load with an empty database, the dashboard seeds 
 |---|---|
 | Language | **Python 3.11** |
 | Models / validation / settings | **Pydantic v2** + pydantic-settings |
-| LLM API | **OpenAI** (structured outputs, `temperature=0`) |
+| LLM API | **Anthropic** (Claude, structured outputs) |
 | Persistence | **SQLite** (stdlib `sqlite3`) |
 | Prompt versioning | **YAML** files |
 | Datasets | **JSON** files |
@@ -233,7 +233,7 @@ Set `MRDS_DEMO=true`. On first load with an empty database, the dashboard seeds 
 | Dashboard (prototype) | **Streamlit** |
 | CI/CD | **GitHub Actions** |
 | Alerts | **Slack** incoming webhooks |
-| Testing | **pytest** (OpenAI always mocked) |
+| Testing | **pytest** (Anthropic always mocked) |
 | Lint / format | **Ruff** |
 
 ---
@@ -251,7 +251,7 @@ src/mrds/
   regression/     detector, thresholds, severity, baseline promotion
   reporting/      Jinja2 report builder + models
   alerting/       Slack client, notifier, message templates
-  llm/            OpenAI structured-output client (injectable, mockable)
+  llm/            Anthropic structured-output client (injectable, mockable)
   db/             SQLite connection, schema.sql, migrations, repositories, store
   config/         layered Pydantic settings
   observability/  structured logging
@@ -282,7 +282,7 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,dashboard,api]"
 
 # 3. Configure your environment
-cp .env.example .env        # then fill in OPENAI_API_KEY (and SLACK_WEBHOOK_URL if desired)
+cp .env.example .env        # then fill in ANTHROPIC_API_KEY (and SLACK_WEBHOOK_URL if desired)
 
 # 4. Explore the CLI
 mrds --help
@@ -317,7 +317,7 @@ MRDS_DEMO=true streamlit run src/mrds/dashboard/app.py
 2. `config/settings.yaml` (committed, non-secret)
 3. Environment variables / `.env` (secrets and per-environment overrides)
 
-Secrets (`OPENAI_API_KEY`, `SLACK_WEBHOOK_URL`) come from the environment only and are never committed. All other settings use the `MRDS_` prefix (e.g. `MRDS_LOG_LEVEL`, `MRDS_MODEL`, `MRDS_DEMO`).
+Secrets (`ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`) come from the environment only and are never committed. All other settings use the `MRDS_` prefix (e.g. `MRDS_LOG_LEVEL`, `MRDS_MODEL`, `MRDS_DEMO`).
 
 ---
 

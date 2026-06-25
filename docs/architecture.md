@@ -189,7 +189,7 @@ model-regression-detector/
 │               └── 4_baselines.py
 │
 ├── tests/
-│   ├── conftest.py                 # Fixtures, mocked OpenAI client
+│   ├── conftest.py                 # Fixtures, mocked Anthropic client
 │   ├── unit/
 │   ├── integration/
 │   └── fixtures/                   # Sample prompts, datasets, recorded responses
@@ -241,7 +241,7 @@ A `Feature` exposes:
 - `input_model` / `output_model` — Pydantic v2 models describing the I/O schema.
 - `prompt_ref` — which prompt family/version the feature uses.
 - `dataset_ref` — which golden dataset family the feature evaluates against.
-- `run(input)` — produce a structured output by calling the model (the only place that talks to the OpenAI API).
+- `run(input)` — produce a structured output by calling the model (the only place that talks to the Anthropic API).
 - `scorers()` — the list of `Scorer`s that grade an output against the expected value.
 
 ### Registration
@@ -287,7 +287,7 @@ engine.run(feature_name)
    ├─ open Run record               (db/repository.py)     → run_id, correlation_id
    │
    ├─ for each test_case in dataset:
-   │      output      = feature.run(test_case.input)        # OpenAI call, timed
+   │      output      = feature.run(test_case.input)        # Anthropic call, timed
    │      for scorer in feature.scorers():
    │          score   = scorer.score(output, test_case.expected)
    │      persist TestResult(run_id, case_id, scores, latency, tokens, cost)
@@ -527,7 +527,7 @@ Prompts live as **YAML files** under `prompts/<feature>/<version>.yaml`. Identit
 feature: email_classifier
 version: v2
 model_defaults:
-  model: gpt-4o-mini
+  model: claude-haiku-4-5
   temperature: 0
 metadata:
   author: rajverma
@@ -686,7 +686,7 @@ The dashboard is a **read/inspection surface**; mutations (promotion, evaluation
 > `activate_bundle` (install + register) → `run_first_evaluation` (unchanged engine → store)
 > → `promote_baseline` — adding no new evaluation or persistence logic. It installs bundles
 > under the writable `settings.platform_root` (which must equal the working directory) and
-> needs `OPENAI_API_KEY`; durable locally, demo-grade on the read-only serverless deployment.
+> needs `ANTHROPIC_API_KEY`; durable locally, demo-grade on the read-only serverless deployment.
 > See **[web-frontend.md](web-frontend.md)** for the API contract, information architecture,
 > and design system.
 
@@ -721,7 +721,7 @@ jobs:
       9. if compare exited non-zero (critical) → job fails → MERGE BLOCKED
 ```
 
-- Secrets `OPENAI_API_KEY` and `SLACK_WEBHOOK_URL` come from GitHub Actions secrets.
+- Secrets `ANTHROPIC_API_KEY` and `SLACK_WEBHOOK_URL` come from GitHub Actions secrets.
 - PRs run the **smoke subset** for speed/cost; the **full dataset** runs nightly and on `main`.
 - Optional auto-promotion: on a green run on `main`, run `promote-baseline` so the baseline tracks shipped quality.
 
@@ -753,7 +753,7 @@ precedence (low → high):
   5. CLI flags                     (highest, per-invocation)
 ```
 
-- **Secrets** (`OPENAI_API_KEY`, `SLACK_WEBHOOK_URL`) only ever come from env/CI secrets; `.env.example` documents them; `.env` is git-ignored.
+- **Secrets** (`ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`) only ever come from env/CI secrets; `.env.example` documents them; `.env` is git-ignored.
 - **Per-environment** knobs (model name, judge on/off, smoke vs full) are overridable so CI can run cheap while local/nightly runs can be thorough.
 - Invalid/missing required config fails fast at startup with a clear validation error.
 
@@ -765,7 +765,7 @@ LLM calls cost money; CI runs frequently. Controls:
 
 - **LLM-as-judge is configurable and OFF by default in CI.** Deterministic scorers (categorical match, P/R/F1, heuristics) gate PRs; the judge is reserved for nightly/full or local deep runs.
 - **Smoke vs full datasets**: PRs evaluate a small representative subset; the full golden set runs nightly/on `main`.
-- **Model selection per environment**: a cheaper model (e.g. `gpt-4o-mini`) for routine CI, larger models only where justified.
+- **Model selection per environment**: a cheaper model (e.g. `claude-haiku-4-5`) for routine CI, larger models only where justified.
 - **Token caps & `temperature=0`**: bounded `max_tokens`, deterministic decoding for reproducibility and predictable cost.
 - **Path-filtered triggers**: `eval.yml` only runs when prompts/datasets/feature/config change — not on unrelated commits.
 - **Cost is tracked per run** (`total_tokens`, `total_cost_usd`) and surfaced in reports and the dashboard, so cost regressions are visible too.
@@ -784,7 +784,7 @@ LLM calls cost money; CI runs frequently. Controls:
 ## 20. Testing Strategy
 
 - **Framework:** pytest. **Lint/format:** Ruff (enforced in `ci.yml`).
-- **OpenAI is always mocked in tests** — recorded/stubbed responses in `tests/fixtures/`; no network calls, no cost, deterministic.
+- **Anthropic is always mocked in tests** — recorded/stubbed responses in `tests/fixtures/`; no network calls, no cost, deterministic.
 - **Unit tests** (`tests/unit/`): metrics math, threshold/regression logic, prompt/dataset hashing, registry behavior, config loading, report rendering, Slack message building, repository CRUD against a temp SQLite DB.
 - **Integration tests** (`tests/integration/`): full `evaluate → compare → report` flow against a temp DB and the mocked client, including the baseline-promotion path and the critical-regression exit code.
 - **Fixtures** (`tests/conftest.py`): temp SQLite DB, sample prompt + dataset versions, mocked model client, a seeded baseline.

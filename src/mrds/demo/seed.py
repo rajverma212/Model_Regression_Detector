@@ -5,7 +5,7 @@ Reuses the *real* platform end-to-end — :class:`EvaluationEngine`,
 — so the demo exercises (and proves) the actual pipeline. Nothing is bypassed.
 
 The routine is idempotent: if the database already contains any runs it does
-nothing. It is deterministic and fully offline (no OpenAI, no network).
+nothing. It is deterministic and fully offline (no Anthropic, no network).
 """
 
 from __future__ import annotations

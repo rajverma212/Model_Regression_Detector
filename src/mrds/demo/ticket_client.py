@@ -1,7 +1,7 @@
 """A deterministic, offline LLM client for the ticket-router demo.
 
 Mirrors :class:`~mrds.demo.client.DeterministicEmailClient`: implements the
-:class:`~mrds.llm.base.StructuredLLMClient` protocol with no network and no OpenAI
+:class:`~mrds.llm.base.StructuredLLMClient` protocol with no network and no Anthropic
 calls. Routing comes from an *oracle* (the dataset's expected labels); a deterministic
 ``wrong_texts`` set has its category misclassified to control accuracy. Priority is
 always taken from the oracle so the demo's regressions are driven by routing quality.

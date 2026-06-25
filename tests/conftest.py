@@ -21,8 +21,8 @@ def _isolate_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
 def clear_secret_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Remove secret env vars so default-value tests are hermetic.
 
-    CI environments may export ``OPENAI_API_KEY`` / ``SLACK_WEBHOOK_URL``; tests
+    CI environments may export ``ANTHROPIC_API_KEY`` / ``SLACK_WEBHOOK_URL``; tests
     asserting default behaviour should not depend on the host environment.
     """
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)

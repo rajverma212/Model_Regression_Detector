@@ -17,12 +17,15 @@ import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
 from mrds.activation.errors import ActivationError
-from mrds.features.spec import FeatureSpec, build_input_model, build_output_model, load_feature_spec
 from mrds.prompts.registry import PromptRegistry
+
+if TYPE_CHECKING:
+    from mrds.features.spec import FeatureSpec
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,9 @@ class InstalledPaths:
 
 def _validate_bundle(spec: FeatureSpec, bundle_dir: Path, dataset_path: Path) -> None:
     """Re-validate the bundle before installing it (schema gate, no LLM)."""
+    # Lazy: avoid an activation<->features import cycle (see discovery.py).
+    from mrds.features.spec import build_input_model, build_output_model
+
     input_model = build_input_model(spec)
     output_model = build_output_model(spec)
     try:
@@ -58,6 +64,8 @@ def install_bundle(bundle_dir: str | Path, *, root: str | Path) -> InstalledPath
     """Install a generated bundle under ``root``; validate first, never overwrite."""
     bundle_dir = Path(bundle_dir)
     root = Path(root)
+
+    from mrds.features.spec import load_feature_spec  # lazy: avoid the import cycle
 
     feature_yaml = bundle_dir / "feature.yaml"
     if not feature_yaml.is_file():

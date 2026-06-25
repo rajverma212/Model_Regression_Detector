@@ -6,7 +6,7 @@ Configuration precedence (low to high):
 2. ``config/settings.yaml`` (committed, non-secret)
 3. Environment variables / ``.env`` (secrets and per-environment overrides)
 
-Secrets (``OPENAI_API_KEY``, ``SLACK_WEBHOOK_URL``) are read from their canonical
+Secrets (``ANTHROPIC_API_KEY``, ``SLACK_WEBHOOK_URL``) are read from their canonical
 environment-variable names and are never committed. All other settings use the
 ``MRDS_`` environment prefix (e.g. ``MRDS_LOG_LEVEL``).
 
@@ -60,18 +60,18 @@ class Settings(BaseSettings):
     # serverless filesystem must point this at a writable location.
     platform_root: Path = Path(".")
 
-    # --- Model defaults (no API client implemented yet) ------------------------
-    model: str = "gpt-4o-mini"
+    # --- Model defaults --------------------------------------------------------
+    model: str = "claude-haiku-4-5"
     judge_enabled: bool = False
 
     # --- Demo mode -------------------------------------------------------------
     # When true, the dashboard seeds deterministic offline demo data into an empty
-    # database so visitors see meaningful pages without OpenAI access.
+    # database so visitors see meaningful pages without Anthropic API access.
     # Bound to MRDS_DEMO (not the prefix-derived MRDS_DEMO_MODE) to match the docs.
     demo_mode: bool = Field(default=False, validation_alias="MRDS_DEMO")
 
     # --- Secrets (canonical env names, no MRDS_ prefix) ------------------------
-    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     slack_webhook_url: str | None = Field(default=None, validation_alias="SLACK_WEBHOOK_URL")
 
     @classmethod

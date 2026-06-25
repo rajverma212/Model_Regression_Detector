@@ -16,13 +16,13 @@ license = { text = "MIT" }
 authors = [{ name = "rajverma" }]
 keywords = ["llm", "evaluation", "regression", "ci", "ml-infrastructure"]
 
-# Foundation dependencies only. Feature-specific deps (openai, jinja2, streamlit,
+# Foundation dependencies only. Feature-specific deps (anthropic, jinja2, streamlit,
 # deepeval, ragas, ...) are introduced in the sprints that need them.
 dependencies = [
     "pydantic>=2.6",
     "pydantic-settings[yaml]>=2.2",
     "pyyaml>=6.0",
-    "openai>=1.50",
+    "anthropic>=0.69",
     "jinja2>=3.1",
 ]
 

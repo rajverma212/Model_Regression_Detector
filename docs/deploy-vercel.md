@@ -11,10 +11,23 @@ auto-redeploying on every `git push` to `main`:
 The frontend reaches the backend through one environment variable, `MRDS_API_URL`
 (set on the `mrds-web` project to the backend URL).
 
-> **How Vercel runs it (one caveat):** Vercel is serverless, so the live site's database is
-> **read-only** — every page shows the seeded demo data perfectly, but the in-UI
-> "Promote to baseline" won't *permanently* save online (it works fully when run locally).
-> The first visit after idle may take a few seconds to wake (cold start).
+> **How Vercel runs it (one caveat):** Vercel is serverless with a filesystem that is
+> **read-only except `/tmp`**. On cold start the backend assembles a single **writable working
+> root** under `/tmp` (a copy of `config/`, `prompts/`, `datasets/`, `specs/` and the seeded
+> `eval.db`) and points the platform at it. So everything works *within a warm instance* —
+> including **end-to-end feature activation** (Create → Activate → first evaluation → baseline →
+> Mission Control) and in-UI baseline promotion — but anything written online (new features,
+> promotions, runs) is **ephemeral**: `/tmp` is per-instance and resets on a cold start. Run
+> locally (or on any persistent host) for durable onboarding. The first visit after idle may
+> take a few seconds to wake (cold start).
+>
+> Activating a feature online also requires `ANTHROPIC_API_KEY` set on the `mrds-api` project
+> (the first evaluation calls the model). Without it, activation returns a clear `422` rather
+> than fabricating an empty baseline.
+>
+> **Durable cloud onboarding** (features that survive cold starts and feed CI gating) needs a
+> persistent volume + external database, plus committing the generated bundle
+> (`specs/`, `prompts/`, `datasets/`) to git so CI sees it — out of scope for this demo deploy.
 
 ## Updating the live site
 
@@ -53,16 +66,20 @@ Two projects share one repo, so the build config has to keep them apart. Three t
    before it builds (empty ~9 ms build → 404). `.gitignore` already keeps `.venv` and
    `node_modules` out of Git clones, so no `.vercelignore` is needed.
 
-How `api/index.py` works on Vercel: it adds repo-root `src/` to `sys.path`, copies the bundled
-`data/seed.db` → `/tmp/eval.db` (the only writable path) on cold start, points the platform at
-it via `MRDS_DATABASE_PATH`, and serves the unchanged `mrds.api.app:app`.
+How `api/index.py` works on Vercel: it adds repo-root `src/` to `sys.path`; on cold start it
+copies the bundled read-only assets (`config/`, `prompts/`, `datasets/`, `specs/`) and the seeded
+`data/seed.db` into a writable working root at `/tmp/mrds`, `chdir`s there, and sets
+`MRDS_PLATFORM_ROOT` + `MRDS_DATABASE_PATH` to it — giving the platform one consistent, writable
+root for both reads and activation writes — then serves the unchanged `mrds.api.app:app`.
+(`includeFiles` in the repo-root `vercel.json` must bundle those asset dirs so they exist to copy.)
 
 ## Reproducing it from scratch
 
 If you ever recreate the projects (dashboard → **Add New… → Project**, import the repo twice):
 
 - **Backend project:** Root Directory = repo root. Framework Preset = **Other** (the repo-root
-  `vercel.json` drives the build). Verify `…/api/health` returns `{"status":"ok",…}`.
+  `vercel.json` drives the build). Verify `…/api/health` returns `{"status":"ok",…}`. For online
+  feature activation, set env var `ANTHROPIC_API_KEY` (otherwise activation returns `422`).
 - **Frontend project:** Root Directory = **`web`**. Framework auto-detects **Next.js**. Add env
   var `MRDS_API_URL` = the backend URL (no trailing slash).
 - New Vercel projects sometimes default to **Deployment Protection on** (blocks public access)

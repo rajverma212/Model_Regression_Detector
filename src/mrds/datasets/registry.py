@@ -103,6 +103,40 @@ class DatasetRegistry:
         )
         return count
 
+    def discover_feature(self, feature: str) -> int:
+        """Scan and register only the datasets under ``<root>/<feature>/``.
+
+        A feature-scoped counterpart to :meth:`discover`: it resolves models and
+        validates files for **one** feature, leaving other features' datasets in the
+        shared root untouched. Use it when the resolver only knows one feature's models
+        (e.g. first-evaluation onboarding), where a full ``discover`` would validate
+        every other feature's dataset against the wrong schema.
+
+        Returns:
+            The number of datasets registered for ``feature``.
+
+        Raises:
+            DatasetError: If the feature's dataset directory does not exist.
+        """
+        feature_dir = self._root / feature
+        if not feature_dir.is_dir():
+            raise DatasetError(f"No dataset directory for feature '{feature}' under {self._root}")
+
+        input_model, output_model = self._resolve_models(feature)
+        count = 0
+        for dataset_file in sorted(self._iter_dataset_files(feature_dir)):
+            dataset = load_dataset_file(
+                dataset_file,
+                input_model=input_model,
+                output_model=output_model,
+                feature=feature,
+            )
+            self.register(dataset)
+            count += 1
+
+        logger.info("Discovered %d dataset(s) for feature %s under %s", count, feature, self._root)
+        return count
+
     def register(self, dataset: LoadedDataset) -> None:
         """Register a single loaded dataset.
 

@@ -35,7 +35,7 @@ concurrency:
 env:
   FEATURE: email_classifier
   MRDS_DATABASE_PATH: data/eval.db
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
 jobs:
   regression-gate:
@@ -67,9 +67,9 @@ jobs:
       - name: Preflight (API key availability)
         id: preflight
         run: |
-          if [ -z "${OPENAI_API_KEY}" ]; then
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
             echo "has_key=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::OPENAI_API_KEY is not set (e.g. a fork PR); skipping the live gate."
+            echo "::warning::ANTHROPIC_API_KEY is not set (e.g. a fork PR); skipping the live gate."
           else
             echo "has_key=true" >> "$GITHUB_OUTPUT"
           fi
