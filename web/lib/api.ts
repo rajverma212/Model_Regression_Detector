@@ -6,6 +6,8 @@
  * below mirror `src/mrds/api/serializers.py` exactly.
  */
 
+import { notFound } from "next/navigation";
+
 const SERVER_ORIGIN = process.env.MRDS_API_URL ?? "http://127.0.0.1:8000";
 
 export type Health = "healthy" | "warning" | "critical" | "unknown";
@@ -264,10 +266,48 @@ export interface RegressionsResponse {
   }[];
 }
 
+/**
+ * A failed backend call, carrying the HTTP status so callers can react to it.
+ * `status === 0` means the backend was unreachable (DNS/connection error — a
+ * serverless cold start that never woke, or a network blip).
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly path: string;
+  constructor(status: number, path: string, options?: ErrorOptions) {
+    super(`API ${path} -> ${status || "unreachable"}`, options);
+    this.name = "ApiError";
+    this.status = status;
+    this.path = path;
+  }
+}
+
 async function serverGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${SERVER_ORIGIN}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`API ${path} -> ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${SERVER_ORIGIN}${path}`, { cache: "no-store" });
+  } catch (cause) {
+    throw new ApiError(0, path, { cause });
+  }
+  if (!res.ok) throw new ApiError(res.status, path);
   return res.json() as Promise<T>;
+}
+
+/**
+ * Fetch a single resource that may legitimately not exist on this serverless
+ * instance. On the Vercel demo deploy, features/runs activated through the web
+ * UI live only in that instance's ephemeral `/tmp`, so a sibling instance
+ * returns 404 (see docs/deploy-vercel.md). Translate that into Next's
+ * `not-found` UI instead of letting it surface as a generic crash; any other
+ * failure (5xx, unreachable) is rethrown for the route's error boundary.
+ */
+async function serverGetOr404<T>(path: string): Promise<T> {
+  try {
+    return await serverGet<T>(path);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) notFound();
+    throw err;
+  }
 }
 
 /** Resilient fleet fetch for the shell/home; returns [] if the API is unreachable. */
@@ -311,13 +351,14 @@ export async function activateFeature(body: ActivateRequest): Promise<Activation
   return data as ActivationResult;
 }
 
-export const getFeature = (f: string) => serverGet<FeatureOverview>(`/api/features/${f}`);
-export const getRuns = (f: string) => serverGet<RunSummary[]>(`/api/features/${f}/runs`);
-export const getTrend = (f: string) => serverGet<TrendPoint[]>(`/api/features/${f}/trend`);
-export const getDataset = (f: string) => serverGet<DatasetView>(`/api/features/${f}/dataset`);
-export const getBaseline = (f: string) => serverGet<BaselineResponse>(`/api/features/${f}/baseline`);
-export const getRun = (uuid: string) => serverGet<RunDetail>(`/api/runs/${uuid}`);
+export const getFeature = (f: string) => serverGetOr404<FeatureOverview>(`/api/features/${f}`);
+export const getRuns = (f: string) => serverGetOr404<RunSummary[]>(`/api/features/${f}/runs`);
+export const getTrend = (f: string) => serverGetOr404<TrendPoint[]>(`/api/features/${f}/trend`);
+export const getDataset = (f: string) => serverGetOr404<DatasetView>(`/api/features/${f}/dataset`);
+export const getBaseline = (f: string) =>
+  serverGetOr404<BaselineResponse>(`/api/features/${f}/baseline`);
+export const getRun = (uuid: string) => serverGetOr404<RunDetail>(`/api/runs/${uuid}`);
 export const getRunRegressions = (uuid: string) =>
-  serverGet<RegressionsResponse>(`/api/runs/${uuid}/regressions`);
+  serverGetOr404<RegressionsResponse>(`/api/runs/${uuid}/regressions`);
 export const compareRuns = (a: string, b: string) =>
-  serverGet<Comparison>(`/api/compare?a=${a}&b=${b}`);
+  serverGetOr404<Comparison>(`/api/compare?a=${a}&b=${b}`);
