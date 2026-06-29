@@ -9,7 +9,7 @@ import streamlit as st
 from mrds.config.settings import Settings, get_settings
 from mrds.dashboard.data import DashboardData, explain_case
 from mrds.dashboard.help_text import PAGE_HELP
-from mrds.db import EvaluationStore, open_database
+from mrds.db import EvaluationStore, get_backend
 from mrds.demo import seed_demo
 from mrds.evaluation.models import CaseResult
 
@@ -38,7 +38,7 @@ def get_data() -> DashboardData:
     In demo mode (``MRDS_DEMO=true``) with an empty database, deterministic offline
     demo data is seeded once before serving. Otherwise the dashboard never writes.
     """
-    store = EvaluationStore(open_database(check_same_thread=False))
+    store = EvaluationStore(get_backend().connect(check_same_thread=False))
     if _demo_enabled(get_settings()) and not store.runs.features():
         with st.spinner("Seeding deterministic demo data (offline, one-time)…"):
             seed_demo(store)

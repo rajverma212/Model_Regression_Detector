@@ -410,6 +410,8 @@ The core engine depends only on the `Scorer` interface. Optional libraries are i
 
 A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode and foreign-key enforcement are enabled via connection pragmas. All writes go through `db/repository.py`.
 
+**Storage backend abstraction.** The database engine is reached through a `StorageBackend` interface (`db/backends/`): a connection factory that opens a connected, schema-bootstrapped `Database`. The configured backend is built by `create_backend()` from `settings.storage_backend` (default `sqlite`) and obtained via `get_backend()`; every runtime entrypoint (HTTP API, CLI, dashboard, demo/onboarding seeders) opens its connection through it rather than calling `open_database` directly. Nothing above the persistence layer references a specific engine, so swapping engines — e.g. adding libSQL/Turso or PostgreSQL later — is a configuration change plus one new backend implementation, with no edits to the engine, regression detector, reporting, dashboard, or CLI. SQLite is the only backend today.
+
 ### Tables
 
 **`runs`** — one row per evaluation run.

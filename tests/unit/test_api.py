@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from mrds.api.app import create_app, get_llm_client, get_platform_root, get_session
 from mrds.api.runtime import ApiSession
-from mrds.db import EvaluationStore, open_database
+from mrds.db import EvaluationStore, SqliteBackend, open_database
 from mrds.demo import seed_demo
 from mrds.llm.base import LLMMessage, LLMResult
 
@@ -48,7 +48,7 @@ def client(_seeded_db: Path, tmp_path: Path) -> Iterator[TestClient]:
     app = create_app()
 
     def _override() -> Iterator[ApiSession]:
-        session = ApiSession(db_path)
+        session = ApiSession(SqliteBackend(db_path))
         try:
             yield session
         finally:
@@ -267,7 +267,7 @@ def activation_client(tmp_path: Path) -> Iterator[TestClient]:
     app = create_app()
 
     def _session() -> Iterator[ApiSession]:
-        session = ApiSession(db_path)
+        session = ApiSession(SqliteBackend(db_path))
         try:
             yield session
         finally:
@@ -387,7 +387,7 @@ def _activate_app(db_path: Path, platform_root: Path, *, with_client: bool) -> o
     app = create_app()
 
     def _session() -> Iterator[ApiSession]:
-        session = ApiSession(db_path)
+        session = ApiSession(SqliteBackend(db_path))
         try:
             yield session
         finally:

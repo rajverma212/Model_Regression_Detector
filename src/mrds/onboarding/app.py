@@ -23,7 +23,7 @@ import streamlit as st
 from mrds.activation import ActivationError
 from mrds.activation.lifecycle import activate_bundle, run_first_evaluation
 from mrds.config.settings import get_settings
-from mrds.db import EvaluationStore, open_database
+from mrds.db import EvaluationStore, get_backend
 from mrds.features.spec import FieldType
 from mrds.onboarding import (
     FeatureFamily,
@@ -253,7 +253,7 @@ elif state["step"] == 7:
     if run.button("Run first evaluation", type="primary", disabled=not has_key):
         with st.spinner("Evaluating…"):
             try:
-                store = EvaluationStore(open_database())
+                store = EvaluationStore(get_backend().connect())
                 state["eval_result"] = run_first_evaluation(installed, root=".", store=store)
             except Exception as exc:  # noqa: BLE001 - surface any run failure in the UI
                 st.error(f"Evaluation failed: {exc}")

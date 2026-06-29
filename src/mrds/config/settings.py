@@ -50,7 +50,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     json_logs: bool = False
 
-    # --- Persistence (path only; the DB layer is implemented in a later sprint)
+    # --- Persistence ----------------------------------------------------------
+    # Which storage backend serves as EvalOS's system of record. Selected here and
+    # built by ``mrds.db.create_backend``; the rest of the system depends only on
+    # the backend interface, so changing engines is configuration, not code.
+    storage_backend: Literal["sqlite"] = "sqlite"
+    # Local SQLite database file (used by the ``sqlite`` backend).
     database_path: Path = Path("data/eval.db")
 
     # --- Platform root: the writable directory holding specs/, prompts/, datasets/.

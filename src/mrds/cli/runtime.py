@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mrds.db import EvaluationStore, open_database
+from mrds.db import EvaluationStore, get_backend
 from mrds.evaluation import EvaluationEngine
 from mrds.observability.logging import get_logger
 from mrds.regression import RegressionDetector
@@ -35,7 +35,7 @@ def build_runtime() -> CliRuntime:
     # engine and dataset registry can resolve them by name.
     import mrds.features  # noqa: F401
 
-    database = open_database()
+    database = get_backend().connect()
     runtime = CliRuntime(
         store=EvaluationStore(database),
         engine=EvaluationEngine(),
