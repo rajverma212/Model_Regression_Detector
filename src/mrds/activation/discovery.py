@@ -18,6 +18,7 @@ from mrds.prompts.loader import DEFAULT_PROMPTS_DIR
 if TYPE_CHECKING:
     from mrds.db import EvaluationStore
     from mrds.features.spec import FeatureSpec
+    from mrds.prompts.registry import PromptRegistry
 
 #: Default location scanned for installed feature specs (relative to the working dir).
 DEFAULT_SPECS_DIR = Path("specs")
@@ -46,6 +47,30 @@ def discover_specs_from_store(store: EvaluationStore) -> list[FeatureSpec]:
     from mrds.features.spec import FeatureSpec  # lazy: avoid the import cycle (see above)
 
     return [FeatureSpec.model_validate_json(r.spec_json) for r in store.feature_specs.list_all()]
+
+
+def load_prompts_from_store(store: EvaluationStore) -> PromptRegistry:
+    """Build a :class:`PromptRegistry` from prompt versions persisted in the database.
+
+    The DB counterpart to :meth:`PromptRegistry.from_directory`. Rows without persisted
+    content (written before prompts moved into the DB, or by paths that only recorded
+    metadata) are skipped — their body still lives on the filesystem.
+    """
+    from mrds.prompts.loader import load_prompt_from_definition_json
+    from mrds.prompts.registry import PromptRegistry
+
+    registry = PromptRegistry()
+    for rec in store.prompt_versions.all():
+        if not rec.content:
+            continue
+        registry.register(
+            load_prompt_from_definition_json(
+                rec.content,
+                feature=rec.feature_name,
+                source_path=Path(rec.path) if rec.path else None,
+            )
+        )
+    return registry
 
 
 def register_installed_features(

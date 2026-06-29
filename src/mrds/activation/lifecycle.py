@@ -75,15 +75,24 @@ def run_first_evaluation(
             feature=spec.feature_name, segment_field=spec.segment_field, max_cases=max_cases
         )
     )
-    # Persist the spec into the DB system of record alongside the run (Phase 2): the
-    # feature's definition now lives in the database, not only as specs/<name>.yaml.
-    # The filesystem copy is still written by install_bundle and remains the discovery
-    # source until the cutover in later phases.
+    # Persist the spec and prompt into the DB system of record alongside the run
+    # (Phases 2-3): the feature's definition and prompt body now live in the database,
+    # not only as specs/<name>.yaml and prompts/<name>/v1.yaml. The filesystem copies
+    # are still written by install_bundle and remain the resolution source until the
+    # cutover in later phases.
     store.feature_specs.upsert(
         feature_name=spec.feature_name,
         content_hash=compute_spec_hash(spec),
         spec_json=spec.model_dump_json(),
         segment_field=spec.segment_field,
+    )
+    prompt = prompts.get_latest(spec.resolved_prompt_feature)
+    store.prompt_versions.upsert(
+        feature_name=spec.feature_name,
+        version=prompt.version,
+        content_hash=prompt.content_hash,
+        path=str(prompt.source_path),
+        content=prompt.definition.model_dump_json(),
     )
     store.save_evaluation(result, triggered_by=triggered_by)
     return result

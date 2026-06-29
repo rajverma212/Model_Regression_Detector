@@ -87,12 +87,13 @@ class PromptVersionRepository:
         version: str,
         content_hash: str,
         path: str = "",
+        content: str = "",
         created_at: str | None = None,
     ) -> PromptVersionRecord:
         self._conn.execute(
-            "INSERT INTO prompt_versions(feature_name, version, content_hash, path, created_at) "
-            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(content_hash) DO NOTHING",
-            (feature_name, version, content_hash, path, created_at or _utcnow_iso()),
+            "INSERT INTO prompt_versions(feature_name, version, content_hash, path, content, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(content_hash) DO NOTHING",
+            (feature_name, version, content_hash, path, content, created_at or _utcnow_iso()),
         )
         record = self.get_by_hash(content_hash)
         assert record is not None  # just inserted or already present
@@ -109,6 +110,13 @@ class PromptVersionRepository:
             "SELECT * FROM prompt_versions WHERE id = ?", (version_id,)
         ).fetchone()
         return PromptVersionRecord.model_validate(dict(row)) if row else None
+
+    def all(self) -> list[PromptVersionRecord]:
+        """Every prompt version row, ordered by feature then version."""
+        rows = self._conn.execute(
+            "SELECT * FROM prompt_versions ORDER BY feature_name, version"
+        ).fetchall()
+        return [PromptVersionRecord.model_validate(dict(r)) for r in rows]
 
 
 class DatasetVersionRepository:

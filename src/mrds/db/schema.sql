@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
     version       TEXT    NOT NULL,
     content_hash  TEXT    NOT NULL UNIQUE,
     path          TEXT    NOT NULL DEFAULT '',
+    -- Serialized prompt definition (the prompt body moves into the DB; empty for rows
+    -- written before the prompt content was persisted). Identity remains content_hash.
+    content       TEXT    NOT NULL DEFAULT '',
     created_at    TEXT    NOT NULL
 );
 

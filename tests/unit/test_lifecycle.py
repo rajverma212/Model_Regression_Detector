@@ -96,6 +96,10 @@ def test_run_first_evaluation_persists_and_is_visible(tmp_path: Path) -> None:
     assert persisted_spec is not None
     assert persisted_spec.segment_field == "category"
 
+    # Phase 3: activation also persists the prompt body into the DB.
+    persisted_prompts = [p for p in store.prompt_versions.all() if p.feature_name == "support_cls"]
+    assert persisted_prompts and persisted_prompts[0].content
+
 
 def test_full_create_activate_evaluate_view(tmp_path: Path) -> None:
     # Create

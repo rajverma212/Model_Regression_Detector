@@ -29,6 +29,7 @@ class PromptVersionRecord(_Row):
     version: str
     content_hash: str
     path: str
+    content: str
     created_at: str
 
 

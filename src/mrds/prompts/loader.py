@@ -36,6 +36,25 @@ def compute_content_hash(definition: PromptDefinition) -> str:
     return hash_json(payload)
 
 
+def load_prompt_from_definition_json(
+    content: str, *, feature: str, source_path: Path | None = None
+) -> LoadedPrompt:
+    """Reconstruct a :class:`LoadedPrompt` from a serialized prompt definition.
+
+    The DB read counterpart to :func:`load_prompt_file`: ``content`` is a
+    ``PromptDefinition`` JSON document (as persisted in ``prompt_versions.content``),
+    so there is no file or YAML involved. The content hash is recomputed from the
+    definition, matching how filesystem-loaded prompts derive their identity.
+    """
+    definition = PromptDefinition.model_validate_json(content)
+    return LoadedPrompt(
+        feature=feature,
+        definition=definition,
+        content_hash=compute_content_hash(definition),
+        source_path=source_path or Path(f"db://{feature}/{definition.version}"),
+    )
+
+
 def load_prompt_file(path: Path, *, feature: str | None = None) -> LoadedPrompt:
     """Load, validate, and hash a single prompt file.
 

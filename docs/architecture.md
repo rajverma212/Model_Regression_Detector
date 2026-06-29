@@ -412,7 +412,11 @@ A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode 
 
 **Storage backend abstraction.** The database engine is reached through a `StorageBackend` interface (`db/backends/`): a connection factory that opens a connected, schema-bootstrapped `Database`. The configured backend is built by `create_backend()` from `settings.storage_backend` (default `sqlite`) and obtained via `get_backend()`; every runtime entrypoint (HTTP API, CLI, dashboard, demo/onboarding seeders) opens its connection through it rather than calling `open_database` directly. Nothing above the persistence layer references a specific engine, so swapping engines — e.g. adding libSQL/Turso or PostgreSQL later — is a configuration change plus one new backend implementation, with no edits to the engine, regression detector, reporting, dashboard, or CLI. SQLite is the only backend today.
 
-**Feature specs in the database (schema v2).** Installed feature specifications live in the `feature_specs` table — one row per feature, holding the serialized `FeatureSpec` as opaque `spec_json` keyed by `content_hash`, so the DB layer stays feature-agnostic. Activation persists the spec here (via `run_first_evaluation`) in addition to writing `specs/<name>.yaml`, and `discover_specs_from_store` / `register_installed_features(store=…)` can register features straight from the database. This is the first step of moving feature bundles off the filesystem and into the system of record; the filesystem copy remains the discovery default until a later cutover. The migration is additive (`bootstrap` bumps `user_version` 1→2 and creates the table via `IF NOT EXISTS`), so existing databases gain the table on open with no data change.
+**Feature specs in the database (schema v2).** Installed feature specifications live in the `feature_specs` table — one row per feature, holding the serialized `FeatureSpec` as opaque `spec_json` keyed by `content_hash`, so the DB layer stays feature-agnostic. Activation persists the spec here (via `run_first_evaluation`) in addition to writing `specs/<name>.yaml`, and `discover_specs_from_store` / `register_installed_features(store=…)` can register features straight from the database. This is the first step of moving feature bundles off the filesystem and into the system of record; the filesystem copy remains the discovery default until a later cutover.
+
+**Prompt content in the database (schema v3).** Prompt bodies move into the `prompt_versions.content` column (the serialized `PromptDefinition`); identity stays the `content_hash`. Activation persists the prompt alongside the spec in `run_first_evaluation`, and `load_prompts_from_store(store)` rebuilds a `PromptRegistry` from the database (skipping rows whose content was never persisted, whose bodies still live on the filesystem). As with specs, the filesystem copy remains the resolution default until the cutover.
+
+**Migrations.** `schema.sql` is the full latest shape (used for fresh databases and, via `IF NOT EXISTS`, to add brand-new tables to existing ones). Changes to *existing* tables (e.g. the v3 `content` column) are ordered, incremental `ALTER` steps in `migrations._MIGRATIONS`, keyed by the version they reach; `bootstrap` applies every step newer than the database's `user_version`. Additive throughout — existing databases (including the committed `data/seed.db`) migrate on open with no data change.
 
 ### Tables
 
@@ -490,6 +494,7 @@ A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode 
 | `version` | TEXT | e.g. `v2` |
 | `content_hash` | TEXT UNIQUE | identity = hash of prompt content |
 | `path` | TEXT | source YAML path |
+| `content` | TEXT | serialized `PromptDefinition` (v3); empty for metadata-only rows |
 | `created_at` | TEXT (ISO8601) | |
 
 **`dataset_versions`** — registry of dataset versions.
