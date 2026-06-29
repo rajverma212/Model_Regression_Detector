@@ -12,7 +12,7 @@
 
 ### 🚀 Live app → **[mrds-web.vercel.app](https://mrds-web.vercel.app)**
 
-🔌 **API:** [health check](https://mrds-api.vercel.app/api/health) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🚢 [Deploy guide](docs/deploy-vercel.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
+🔌 **API:** [health check](https://mrds-api.vercel.app/api/health) &nbsp;•&nbsp; 📐 [Architecture](docs/architecture.md) &nbsp;•&nbsp; 🛰️ [Web frontend](docs/web-frontend.md) &nbsp;•&nbsp; 🚢 [Deploy guide](docs/deploy-vercel.md) &nbsp;•&nbsp; 💾 [Durable deploy](docs/deploy-render.md) &nbsp;•&nbsp; 🤖 [Agent context](CLAUDE.md)
 
 <sub>The original Streamlit dashboard — the prototype this product grew out of — is archived at [modelregressiondetector.streamlit.app](https://modelregressiondetector.streamlit.app).</sub>
 

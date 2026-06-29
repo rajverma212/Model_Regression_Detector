@@ -1,0 +1,37 @@
+# Render Blueprint — durable, persistent-disk deploy of the MRDS API backend.
+#
+# This is the durable counterpart to the Vercel serverless deploy (api/index.py +
+# vercel.json). A mounted disk makes the SQLite database and every activated
+# feature bundle survive restarts/redeploys, and pins the service to a single
+# instance — so the per-instance "ephemeral /tmp" 404s of the serverless deploy
+# cannot happen. Import this file via Render → New → Blueprint.
+#
+# Note: a persistent disk requires a paid instance (Render's free tier has no
+# disk). After deploy, point the frontend's MRDS_API_URL at this service's URL.
+# See docs/deploy-render.md.
+services:
+  - type: web
+    name: mrds-api
+    runtime: python
+    plan: starter # disks are unavailable on the free plan
+    region: oregon
+    buildCommand: pip install ".[api]"
+    startCommand: python scripts/start_server.py
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: mrds-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      # The durable platform root (matches the disk mountPath). The bootstrap
+      # seeds committed assets + the demo DB here on first boot, then reuses it.
+      - key: MRDS_PLATFORM_ROOT
+        value: /data
+      # Pin the interpreter; the project supports 3.11–3.13.
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # Required for online feature activation (the first evaluation calls the
+      # model). Set the secret in the Render dashboard, not in this file.
+      - key: ANTHROPIC_API_KEY
+        sync: false

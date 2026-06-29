@@ -25,9 +25,11 @@ The frontend reaches the backend through one environment variable, `MRDS_API_URL
 > (the first evaluation calls the model). Without it, activation returns a clear `422` rather
 > than fabricating an empty baseline.
 >
-> **Durable cloud onboarding** (features that survive cold starts and feed CI gating) needs a
-> persistent volume + external database, plus committing the generated bundle
-> (`specs/`, `prompts/`, `datasets/`) to git so CI sees it — out of scope for this demo deploy.
+> **Durable cloud onboarding** (features that survive cold starts) — deploy the backend to a
+> host with a **persistent disk** instead of serverless `/tmp`. The same code runs unchanged;
+> see [deploy-render.md](deploy-render.md). (Feeding online-activated features into CI gating
+> additionally needs the generated bundle — `specs/`, `prompts/`, `datasets/` — committed to git
+> so CI sees it.)
 
 ## Updating the live site
 
