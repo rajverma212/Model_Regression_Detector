@@ -13,6 +13,16 @@ class _Row(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class FeatureSpecRecord(_Row):
+    id: int
+    feature_name: str
+    content_hash: str
+    spec_json: str
+    segment_field: str | None
+    created_at: str
+    updated_at: str
+
+
 class PromptVersionRecord(_Row):
     id: int
     feature_name: str

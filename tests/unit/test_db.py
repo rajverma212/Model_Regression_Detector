@@ -9,6 +9,7 @@ import pytest
 from mrds.core.interfaces import ScoreResult
 from mrds.datasets.models import Difficulty
 from mrds.db import DbError, EvaluationStore, open_database
+from mrds.db.migrations import SCHEMA_VERSION
 from mrds.evaluation.models import (
     AggregateMetrics,
     CaseResult,
@@ -23,6 +24,7 @@ from mrds.regression import RegressionDetector
 NOW = datetime(2026, 5, 29, 12, 0, 0, tzinfo=UTC)
 
 EXPECTED_TABLES = {
+    "feature_specs",
     "prompt_versions",
     "dataset_versions",
     "runs",
@@ -141,12 +143,12 @@ def test_bootstrap_creates_all_tables() -> None:
     rows = db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     names = {r["name"] for r in rows}
     assert names >= EXPECTED_TABLES
-    assert db.connection.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert db.connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_bootstrap_is_idempotent() -> None:
     db = open_database(":memory:")
-    assert db.bootstrap() == 1  # second call is a no-op and returns the version
+    assert db.bootstrap() == SCHEMA_VERSION  # second call is a no-op and returns the version
 
 
 def test_open_database_creates_file(tmp_path) -> None:

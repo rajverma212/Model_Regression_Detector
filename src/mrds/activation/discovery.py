@@ -16,6 +16,7 @@ from mrds.core.registry import FeatureRegistry, feature_registry
 from mrds.prompts.loader import DEFAULT_PROMPTS_DIR
 
 if TYPE_CHECKING:
+    from mrds.db import EvaluationStore
     from mrds.features.spec import FeatureSpec
 
 #: Default location scanned for installed feature specs (relative to the working dir).
@@ -35,21 +36,40 @@ def discover_specs(specs_dir: str | Path = DEFAULT_SPECS_DIR) -> list[FeatureSpe
     return [load_feature_spec(path) for path in sorted(specs_dir.glob("*.yaml"))]
 
 
+def discover_specs_from_store(store: EvaluationStore) -> list[FeatureSpec]:
+    """Load every installed spec persisted in the database.
+
+    The DB read counterpart to :func:`discover_specs`. Specs are stored opaquely as
+    JSON, so the feature-agnostic store hands back raw rows and this layer (which owns
+    the spec model) reconstructs them.
+    """
+    from mrds.features.spec import FeatureSpec  # lazy: avoid the import cycle (see above)
+
+    return [FeatureSpec.model_validate_json(r.spec_json) for r in store.feature_specs.list_all()]
+
+
 def register_installed_features(
     *,
     specs_dir: str | Path = DEFAULT_SPECS_DIR,
     prompts_dir: str | Path = DEFAULT_PROMPTS_DIR,
     registry: FeatureRegistry = feature_registry,
+    store: EvaluationStore | None = None,
 ) -> list[str]:
     """Register all discovered spec features not already in ``registry``.
 
-    Returns the names newly registered. Idempotent; never clobbers an existing
-    (hand-coded or previously registered) feature.
+    Specs are sourced from ``specs_dir`` (filesystem) and, when ``store`` is given,
+    also from the database — the union, so a feature persisted in either place is
+    registered. Returns the names newly registered. Idempotent; never clobbers an
+    existing (hand-coded or previously registered) feature.
     """
     from mrds.features.spec import build_from_spec  # lazy: avoid the import cycle (see above)
 
+    specs = list(discover_specs(specs_dir))
+    if store is not None:
+        specs.extend(discover_specs_from_store(store))
+
     registered: list[str] = []
-    for spec in discover_specs(specs_dir):
+    for spec in specs:
         if spec.feature_name in registry:
             continue
         feature = build_from_spec(spec, prompts_dir=Path(prompts_dir))

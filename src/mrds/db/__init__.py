@@ -12,6 +12,7 @@ from mrds.db.errors import DbError
 from mrds.db.records import (
     BaselineRecord,
     DatasetVersionRecord,
+    FeatureSpecRecord,
     PromptVersionRecord,
     RegressionRecord,
     RunRecord,
@@ -25,6 +26,7 @@ __all__ = [
     "DatasetVersionRecord",
     "DbError",
     "EvaluationStore",
+    "FeatureSpecRecord",
     "PromptVersionRecord",
     "RegressionRecord",
     "RunRecord",

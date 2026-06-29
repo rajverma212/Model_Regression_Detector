@@ -91,6 +91,11 @@ def test_run_first_evaluation_persists_and_is_visible(tmp_path: Path) -> None:
     assert "support_cls" in data.features()
     assert [r.run_uuid for r in data.runs("support_cls")] == [result.run_id]
 
+    # Phase 2: activation also persists the feature spec into the DB system of record.
+    persisted_spec = store.feature_specs.get("support_cls")
+    assert persisted_spec is not None
+    assert persisted_spec.segment_field == "category"
+
 
 def test_full_create_activate_evaluate_view(tmp_path: Path) -> None:
     # Create

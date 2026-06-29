@@ -412,7 +412,11 @@ A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode 
 
 **Storage backend abstraction.** The database engine is reached through a `StorageBackend` interface (`db/backends/`): a connection factory that opens a connected, schema-bootstrapped `Database`. The configured backend is built by `create_backend()` from `settings.storage_backend` (default `sqlite`) and obtained via `get_backend()`; every runtime entrypoint (HTTP API, CLI, dashboard, demo/onboarding seeders) opens its connection through it rather than calling `open_database` directly. Nothing above the persistence layer references a specific engine, so swapping engines — e.g. adding libSQL/Turso or PostgreSQL later — is a configuration change plus one new backend implementation, with no edits to the engine, regression detector, reporting, dashboard, or CLI. SQLite is the only backend today.
 
+**Feature specs in the database (schema v2).** Installed feature specifications live in the `feature_specs` table — one row per feature, holding the serialized `FeatureSpec` as opaque `spec_json` keyed by `content_hash`, so the DB layer stays feature-agnostic. Activation persists the spec here (via `run_first_evaluation`) in addition to writing `specs/<name>.yaml`, and `discover_specs_from_store` / `register_installed_features(store=…)` can register features straight from the database. This is the first step of moving feature bundles off the filesystem and into the system of record; the filesystem copy remains the discovery default until a later cutover. The migration is additive (`bootstrap` bumps `user_version` 1→2 and creates the table via `IF NOT EXISTS`), so existing databases gain the table on open with no data change.
+
 ### Tables
+
+**`feature_specs`** — one row per installed feature; the declarative spec (`spec_json`), `content_hash`, and `segment_field`.
 
 **`runs`** — one row per evaluation run.
 

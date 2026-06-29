@@ -20,6 +20,20 @@ CREATE TABLE IF NOT EXISTS dataset_versions (
     created_at    TEXT    NOT NULL
 );
 
+-- Installed feature specifications (the declarative onboarding spec). One row per
+-- feature; ``spec_json`` is the serialized FeatureSpec, stored opaquely so this layer
+-- stays feature-agnostic. Identity is the content hash. This is the DB home for what
+-- previously lived only as ``specs/<name>.yaml`` on the filesystem.
+CREATE TABLE IF NOT EXISTS feature_specs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    feature_name  TEXT    NOT NULL UNIQUE,
+    content_hash  TEXT    NOT NULL,
+    spec_json     TEXT    NOT NULL,
+    segment_field TEXT,
+    created_at    TEXT    NOT NULL,
+    updated_at    TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     run_uuid            TEXT    NOT NULL UNIQUE,

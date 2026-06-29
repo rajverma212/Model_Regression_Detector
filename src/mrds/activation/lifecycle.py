@@ -19,7 +19,7 @@ from mrds.datasets.registry import DatasetRegistry
 from mrds.db import EvaluationStore
 from mrds.evaluation import EvaluationConfig, EvaluationEngine
 from mrds.evaluation.models import EvaluationResult
-from mrds.features.spec import build_from_spec, load_feature_spec
+from mrds.features.spec import build_from_spec, compute_spec_hash, load_feature_spec
 from mrds.llm.base import StructuredLLMClient
 from mrds.prompts.registry import PromptRegistry
 
@@ -74,6 +74,16 @@ def run_first_evaluation(
         EvaluationConfig(
             feature=spec.feature_name, segment_field=spec.segment_field, max_cases=max_cases
         )
+    )
+    # Persist the spec into the DB system of record alongside the run (Phase 2): the
+    # feature's definition now lives in the database, not only as specs/<name>.yaml.
+    # The filesystem copy is still written by install_bundle and remains the discovery
+    # source until the cutover in later phases.
+    store.feature_specs.upsert(
+        feature_name=spec.feature_name,
+        content_hash=compute_spec_hash(spec),
+        spec_json=spec.model_dump_json(),
+        segment_field=spec.segment_field,
     )
     store.save_evaluation(result, triggered_by=triggered_by)
     return result

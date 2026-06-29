@@ -7,7 +7,7 @@ effects**: it does not touch the global feature registry or any core subsystem.
 """
 
 from mrds.features.spec.feature import GenericStructuredFeature, build_from_spec
-from mrds.features.spec.loader import load_feature_spec
+from mrds.features.spec.loader import compute_spec_hash, load_feature_spec
 from mrds.features.spec.models import (
     build_enum,
     build_input_model,
@@ -46,5 +46,6 @@ __all__ = [
     "build_model",
     "build_output_model",
     "build_scorer",
+    "compute_spec_hash",
     "load_feature_spec",
 ]

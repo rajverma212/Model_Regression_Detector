@@ -16,6 +16,7 @@ from mrds.db.connection import Database
 from mrds.db.records import (
     BaselineRecord,
     DatasetVersionRecord,
+    FeatureSpecRecord,
     PromptVersionRecord,
     RegressionRecord,
     RunRecord,
@@ -27,6 +28,50 @@ from mrds.regression.models import MetricComparison
 
 def _utcnow_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+class FeatureSpecRepository:
+    """Stores installed feature specifications, one row per feature.
+
+    The spec is held opaquely as ``spec_json`` so this layer stays feature-agnostic
+    (it never imports the spec model). Upsert-by-name: re-activating a feature updates
+    its spec in place while preserving ``created_at``.
+    """
+
+    def __init__(self, db: Database) -> None:
+        self._conn: sqlite3.Connection = db.connection
+
+    def upsert(
+        self,
+        *,
+        feature_name: str,
+        content_hash: str,
+        spec_json: str,
+        segment_field: str | None = None,
+        created_at: str | None = None,
+    ) -> FeatureSpecRecord:
+        now = created_at or _utcnow_iso()
+        self._conn.execute(
+            "INSERT INTO feature_specs(feature_name, content_hash, spec_json, segment_field, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(feature_name) DO UPDATE SET "
+            "content_hash=excluded.content_hash, spec_json=excluded.spec_json, "
+            "segment_field=excluded.segment_field, updated_at=excluded.updated_at",
+            (feature_name, content_hash, spec_json, segment_field, now, now),
+        )
+        record = self.get(feature_name)
+        assert record is not None  # just inserted or updated
+        return record
+
+    def get(self, feature_name: str) -> FeatureSpecRecord | None:
+        row = self._conn.execute(
+            "SELECT * FROM feature_specs WHERE feature_name = ?", (feature_name,)
+        ).fetchone()
+        return FeatureSpecRecord.model_validate(dict(row)) if row else None
+
+    def list_all(self) -> list[FeatureSpecRecord]:
+        rows = self._conn.execute("SELECT * FROM feature_specs ORDER BY feature_name").fetchall()
+        return [FeatureSpecRecord.model_validate(dict(r)) for r in rows]
 
 
 class PromptVersionRepository:

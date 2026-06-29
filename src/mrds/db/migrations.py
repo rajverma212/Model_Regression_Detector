@@ -14,7 +14,10 @@ from mrds.observability.logging import get_logger
 
 logger = get_logger(__name__)
 
-SCHEMA_VERSION = 1
+# v2: added the ``feature_specs`` table (feature specs move from filesystem into the DB).
+# The schema is written with ``IF NOT EXISTS``, so bumping the version simply creates the
+# new table on existing databases — an additive, idempotent migration.
+SCHEMA_VERSION = 2
 
 
 def _schema_sql() -> str:

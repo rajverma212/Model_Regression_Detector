@@ -20,6 +20,7 @@ from mrds.db.records import BaselineRecord, RegressionRecord, RunRecord, TestRes
 from mrds.db.repositories import (
     BaselineRepository,
     DatasetVersionRepository,
+    FeatureSpecRepository,
     PromptVersionRepository,
     RegressionRepository,
     RunRepository,
@@ -37,6 +38,7 @@ class EvaluationStore:
 
     def __init__(self, db: Database) -> None:
         self._db = db
+        self.feature_specs = FeatureSpecRepository(db)
         self.prompt_versions = PromptVersionRepository(db)
         self.dataset_versions = DatasetVersionRepository(db)
         self.runs = RunRepository(db)
