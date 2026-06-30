@@ -37,6 +37,33 @@ def compute_content_hash(definition: DatasetDefinition[Any, Any]) -> str:
     return hash_json(payload)
 
 
+def load_dataset_from_definition_json(
+    content: str,
+    *,
+    input_model: type[BaseModel],
+    output_model: type[BaseModel],
+    feature: str,
+    source_path: Path | None = None,
+) -> LoadedDataset:
+    """Reconstruct a :class:`LoadedDataset` from a serialized dataset definition.
+
+    The DB read counterpart to :func:`load_dataset_file`: ``content`` is a
+    ``DatasetDefinition`` JSON document (as persisted in ``dataset_versions.content``),
+    validated against the feature's models exactly like a file would be. The content
+    hash is recomputed, matching how filesystem-loaded datasets derive their identity.
+    """
+    data = json.loads(content)
+    definition = validate_dataset_data(
+        data, input_model=input_model, output_model=output_model, source=source_path
+    )
+    return LoadedDataset(
+        feature=feature,
+        definition=definition,
+        content_hash=compute_content_hash(definition),
+        source_path=source_path or Path(f"db://{feature}/{definition.version}"),
+    )
+
+
 def load_dataset_file(
     path: Path,
     *,

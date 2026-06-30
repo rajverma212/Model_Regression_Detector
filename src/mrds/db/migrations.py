@@ -14,6 +14,7 @@ step newer than the database's current version is applied. A fresh database (ver
 History:
 * v2 — ``feature_specs`` table (new table; handled by ``schema.sql``, no step).
 * v3 — ``prompt_versions.content`` column (prompt bodies move into the DB).
+* v4 — ``dataset_versions.content`` column (dataset cases move into the DB).
 """
 
 from __future__ import annotations
@@ -25,12 +26,13 @@ from mrds.observability.logging import get_logger
 
 logger = get_logger(__name__)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 #: Incremental upgrade steps for *existing* databases, keyed by the version reached.
 #: Only changes to existing tables need a step; new tables come from ``schema.sql``.
 _MIGRATIONS: tuple[tuple[int, str], ...] = (
     (3, "ALTER TABLE prompt_versions ADD COLUMN content TEXT NOT NULL DEFAULT '';"),
+    (4, "ALTER TABLE dataset_versions ADD COLUMN content TEXT NOT NULL DEFAULT '';"),
 )
 
 

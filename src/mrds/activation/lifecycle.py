@@ -75,11 +75,11 @@ def run_first_evaluation(
             feature=spec.feature_name, segment_field=spec.segment_field, max_cases=max_cases
         )
     )
-    # Persist the spec and prompt into the DB system of record alongside the run
-    # (Phases 2-3): the feature's definition and prompt body now live in the database,
-    # not only as specs/<name>.yaml and prompts/<name>/v1.yaml. The filesystem copies
-    # are still written by install_bundle and remain the resolution source until the
-    # cutover in later phases.
+    # Persist the spec, prompt, and dataset into the DB system of record alongside the
+    # run (Phases 2-4): the feature's definition, prompt body, and labeled cases now
+    # live in the database, not only as specs/<name>.yaml, prompts/<name>/v1.yaml, and
+    # datasets/<name>/v1.json. The filesystem copies are still written by install_bundle
+    # and remain the resolution source until the cutover in later phases.
     store.feature_specs.upsert(
         feature_name=spec.feature_name,
         content_hash=compute_spec_hash(spec),
@@ -93,6 +93,15 @@ def run_first_evaluation(
         content_hash=prompt.content_hash,
         path=str(prompt.source_path),
         content=prompt.definition.model_dump_json(),
+    )
+    dataset = datasets.get_latest(spec.feature_name)
+    store.dataset_versions.upsert(
+        feature_name=spec.feature_name,
+        version=dataset.version,
+        content_hash=dataset.content_hash,
+        case_count=dataset.case_count,
+        path=str(dataset.source_path),
+        content=dataset.definition.model_dump_json(),
     )
     store.save_evaluation(result, triggered_by=triggered_by)
     return result

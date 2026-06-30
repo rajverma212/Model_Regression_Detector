@@ -416,6 +416,8 @@ A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode 
 
 **Prompt content in the database (schema v3).** Prompt bodies move into the `prompt_versions.content` column (the serialized `PromptDefinition`); identity stays the `content_hash`. Activation persists the prompt alongside the spec in `run_first_evaluation`, and `load_prompts_from_store(store)` rebuilds a `PromptRegistry` from the database (skipping rows whose content was never persisted, whose bodies still live on the filesystem). As with specs, the filesystem copy remains the resolution default until the cutover.
 
+**Dataset content in the database (schema v4).** Labeled cases move into the `dataset_versions.content` column (the serialized `DatasetDefinition`); identity stays the `content_hash`. Activation persists the dataset alongside the spec and prompt in `run_first_evaluation`, and `load_datasets_from_store(store, model_resolver=…)` rebuilds a `DatasetRegistry` from the database — validating cases against the feature's models (resolved via the feature registry by default, so features must be registered first) and skipping metadata-only rows. As with specs and prompts, the filesystem copy remains the resolution default until the cutover. With v4, the full feature bundle — spec, prompt, and dataset — is persisted in the system of record.
+
 **Migrations.** `schema.sql` is the full latest shape (used for fresh databases and, via `IF NOT EXISTS`, to add brand-new tables to existing ones). Changes to *existing* tables (e.g. the v3 `content` column) are ordered, incremental `ALTER` steps in `migrations._MIGRATIONS`, keyed by the version they reach; `bootstrap` applies every step newer than the database's `user_version`. Additive throughout — existing databases (including the committed `data/seed.db`) migrate on open with no data change.
 
 ### Tables
@@ -507,6 +509,7 @@ A single SQLite database (`data/eval.db`) is the **system of record**. WAL mode 
 | `content_hash` | TEXT UNIQUE | identity = hash of dataset content |
 | `path` | TEXT | source JSON path |
 | `case_count` | INTEGER | number of golden cases |
+| `content` | TEXT | serialized `DatasetDefinition` (v4); empty for metadata-only rows |
 | `created_at` | TEXT (ISO8601) | |
 
 ### Relationships

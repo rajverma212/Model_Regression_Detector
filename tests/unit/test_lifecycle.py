@@ -100,6 +100,13 @@ def test_run_first_evaluation_persists_and_is_visible(tmp_path: Path) -> None:
     persisted_prompts = [p for p in store.prompt_versions.all() if p.feature_name == "support_cls"]
     assert persisted_prompts and persisted_prompts[0].content
 
+    # Phase 4: activation also persists the dataset cases into the DB.
+    persisted_datasets = [
+        d for d in store.dataset_versions.all() if d.feature_name == "support_cls"
+    ]
+    assert persisted_datasets and persisted_datasets[0].content
+    assert persisted_datasets[0].case_count == 4
+
 
 def test_full_create_activate_evaluate_view(tmp_path: Path) -> None:
     # Create

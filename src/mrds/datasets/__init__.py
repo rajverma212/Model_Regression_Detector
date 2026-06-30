@@ -18,6 +18,7 @@ from mrds.datasets.loader import (
     DEFAULT_DATASETS_DIR,
     compute_content_hash,
     load_dataset_file,
+    load_dataset_from_definition_json,
 )
 from mrds.datasets.models import (
     DatasetCase,
@@ -39,4 +40,5 @@ __all__ = [
     "LoadedDataset",
     "compute_content_hash",
     "load_dataset_file",
+    "load_dataset_from_definition_json",
 ]

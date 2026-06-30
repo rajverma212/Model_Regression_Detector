@@ -16,6 +16,7 @@ from mrds.core.registry import FeatureRegistry, feature_registry
 from mrds.prompts.loader import DEFAULT_PROMPTS_DIR
 
 if TYPE_CHECKING:
+    from mrds.datasets.registry import DatasetRegistry, ModelResolver
     from mrds.db import EvaluationStore
     from mrds.features.spec import FeatureSpec
     from mrds.prompts.registry import PromptRegistry
@@ -66,6 +67,37 @@ def load_prompts_from_store(store: EvaluationStore) -> PromptRegistry:
         registry.register(
             load_prompt_from_definition_json(
                 rec.content,
+                feature=rec.feature_name,
+                source_path=Path(rec.path) if rec.path else None,
+            )
+        )
+    return registry
+
+
+def load_datasets_from_store(
+    store: EvaluationStore, *, model_resolver: ModelResolver | None = None
+) -> DatasetRegistry:
+    """Build a :class:`DatasetRegistry` from dataset versions persisted in the database.
+
+    The DB counterpart to :meth:`DatasetRegistry.from_directory`. Cases are validated
+    against the feature's models (resolved via ``model_resolver``, defaulting to the
+    global feature registry), so the relevant features must be registered first. Rows
+    without persisted content are skipped — their cases still live on the filesystem.
+    """
+    from mrds.datasets.loader import load_dataset_from_definition_json
+    from mrds.datasets.registry import DatasetRegistry, _default_model_resolver
+
+    resolve = model_resolver or _default_model_resolver
+    registry = DatasetRegistry(model_resolver=resolve)
+    for rec in store.dataset_versions.all():
+        if not rec.content:
+            continue
+        input_model, output_model = resolve(rec.feature_name)
+        registry.register(
+            load_dataset_from_definition_json(
+                rec.content,
+                input_model=input_model,
+                output_model=output_model,
                 feature=rec.feature_name,
                 source_path=Path(rec.path) if rec.path else None,
             )

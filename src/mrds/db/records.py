@@ -40,6 +40,7 @@ class DatasetVersionRecord(_Row):
     content_hash: str
     path: str
     case_count: int
+    content: str
     created_at: str
 
 

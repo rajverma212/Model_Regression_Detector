@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS dataset_versions (
     content_hash  TEXT    NOT NULL UNIQUE,
     path          TEXT    NOT NULL DEFAULT '',
     case_count    INTEGER NOT NULL DEFAULT 0,
+    -- Serialized dataset definition (the cases move into the DB; empty for rows written
+    -- before the dataset content was persisted). Identity remains content_hash.
+    content       TEXT    NOT NULL DEFAULT '',
     created_at    TEXT    NOT NULL
 );
 

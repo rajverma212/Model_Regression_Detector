@@ -133,13 +133,22 @@ class DatasetVersionRepository:
         content_hash: str,
         case_count: int = 0,
         path: str = "",
+        content: str = "",
         created_at: str | None = None,
     ) -> DatasetVersionRecord:
         self._conn.execute(
             "INSERT INTO dataset_versions(feature_name, version, content_hash, path, "
-            "case_count, created_at) VALUES (?, ?, ?, ?, ?, ?) "
+            "case_count, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(content_hash) DO NOTHING",
-            (feature_name, version, content_hash, path, case_count, created_at or _utcnow_iso()),
+            (
+                feature_name,
+                version,
+                content_hash,
+                path,
+                case_count,
+                content,
+                created_at or _utcnow_iso(),
+            ),
         )
         record = self.get_by_hash(content_hash)
         assert record is not None
@@ -156,6 +165,13 @@ class DatasetVersionRepository:
             "SELECT * FROM dataset_versions WHERE id = ?", (version_id,)
         ).fetchone()
         return DatasetVersionRecord.model_validate(dict(row)) if row else None
+
+    def all(self) -> list[DatasetVersionRecord]:
+        """Every dataset version row, ordered by feature then version."""
+        rows = self._conn.execute(
+            "SELECT * FROM dataset_versions ORDER BY feature_name, version"
+        ).fetchall()
+        return [DatasetVersionRecord.model_validate(dict(r)) for r in rows]
 
 
 class RunRepository:
