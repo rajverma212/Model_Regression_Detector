@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from mrds.activation.lifecycle import activate_bundle, run_first_evaluation
+from mrds.activation import ActivationError
+from mrds.activation.lifecycle import (
+    activate_bundle,
+    activate_feature_from_store,
+    run_first_evaluation,
+)
 from mrds.core.registry import FeatureRegistry
 from mrds.dashboard.data import DashboardData
 from mrds.db import EvaluationStore, open_database
@@ -61,6 +66,35 @@ def _onboard(tmp_path: Path, name: str = "support_cls") -> Path:
     return write_feature_bundle(
         spec, cases=_RAW["cases"], system_prompt=prompt, root=tmp_path / "work"
     ).bundle_dir
+
+
+def test_activate_feature_from_store_is_filesystem_free(tmp_path: Path) -> None:
+    spec = infer_feature_spec(_RAW, feature_name="db_native", feature_type="classification")
+    store = EvaluationStore(open_database(":memory:"))
+
+    result = activate_feature_from_store(
+        spec,
+        cases=_RAW["cases"],
+        system_prompt="Classify the message into one category. Respond as JSON.",
+        store=store,
+        client=_Stub(),
+    )
+
+    assert result.feature == "db_native"
+    assert result.aggregate_metrics.total_cases == 4
+    # The full bundle is persisted in the DB system of record (spec + prompt + dataset).
+    assert store.feature_specs.get("db_native") is not None
+    assert store.prompt_versions.all()[0].content
+    assert store.dataset_versions.all()[0].content
+    # The run is visible in Mission Control, and nothing was written to the filesystem.
+    assert "db_native" in DashboardData(store).features()
+    assert not any(tmp_path.iterdir())
+
+    # Re-activation of an already-activated feature is rejected.
+    with pytest.raises(ActivationError):
+        activate_feature_from_store(
+            spec, cases=_RAW["cases"], system_prompt="x", store=store, client=_Stub()
+        )
 
 
 def test_activate_bundle_installs_and_registers(tmp_path: Path) -> None:

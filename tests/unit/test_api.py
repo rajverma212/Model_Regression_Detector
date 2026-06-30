@@ -426,12 +426,15 @@ def test_activate_fails_fast_without_llm_key(
     assert not (platform_root / "specs").exists()  # nothing persisted
 
 
-def test_activate_returns_clear_error_when_root_unwritable(tmp_path: Path) -> None:
-    """A non-writable platform root → a clear JSON 503, not an opaque plain-text 500."""
+def test_activate_succeeds_without_a_writable_root(tmp_path: Path) -> None:
+    """Phase 5: activation is filesystem-free, so a non-writable platform root is fine.
+
+    The database is the system of record; the platform root is never written. Previously
+    this scenario returned a 503; now it succeeds.
+    """
     db_path = tmp_path / "eval.db"
     open_database(db_path).close()
-    # Parent is a *file*, so creating any directory under it raises OSError for everyone
-    # (robust across CI-as-root, unlike chmod).
+    # A platform root that could never be created or written (parent is a file).
     blocker = tmp_path / "not_a_dir"
     blocker.write_text("x", encoding="utf-8")
     platform_root = blocker / "sub"
@@ -447,5 +450,6 @@ def test_activate_returns_clear_error_when_root_unwritable(tmp_path: Path) -> No
                 "system_prompt": "Classify. JSON out.",
             },
         )
-    assert resp.status_code == 503
-    assert "not writable" in resp.json()["detail"]
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["feature"] == "readonly"
+    assert not platform_root.exists()  # nothing was written to the filesystem

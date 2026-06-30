@@ -13,7 +13,6 @@ FastAPI's threadpool is unsafe. Run it with ``python -m mrds.api``.
 
 from __future__ import annotations
 
-import tempfile
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from mrds.activation import ActivationError
-from mrds.activation.lifecycle import activate_bundle, run_first_evaluation
+from mrds.activation.lifecycle import activate_feature_from_store
 from mrds.api.runtime import ApiSession
 from mrds.api.serializers import (
     health_from_records,
@@ -49,7 +48,6 @@ from mrds.db.records import BaselineRecord
 from mrds.evaluation.models import AggregateMetrics
 from mrds.llm.base import StructuredLLMClient
 from mrds.llm.errors import LLMConfigurationError
-from mrds.onboarding import write_feature_bundle
 from mrds.onboarding.errors import OnboardingError
 from mrds.onboarding.inference import infer_feature_spec
 from mrds.onboarding.scaffold import scaffold_prompt
@@ -456,17 +454,17 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
     def onboarding_activate(
         body: ActivateRequest,
         session: ApiSession = Depends(get_session),
-        platform_root: Path = Depends(get_platform_root),
         client: StructuredLLMClient | None = Depends(get_llm_client),
     ) -> dict[str, Any]:
-        """Activate an onboarded feature end-to-end: persist → install → register → evaluate.
+        """Activate an onboarded feature end-to-end: persist → register → evaluate.
 
         Stitches the existing onboarding/activation/evaluation pieces together (it adds no
         evaluation or persistence logic of its own): re-infers the spec from the labeled
-        cases, writes a bundle, installs and registers it under ``platform_root``, runs the
-        first evaluation through the unchanged engine, persists it via the store, and
-        promotes the result as the initial baseline. After this returns, the feature has a
-        persisted run and so appears in Mission Control immediately.
+        cases, persists the spec/prompt/dataset to the database, runs the first evaluation
+        through the unchanged engine reading the bundle back from the database, persists the
+        run, and promotes the result as the initial baseline. This is **filesystem-free** —
+        the database is the system of record, so it works on a read-only platform root.
+        After this returns, the feature has a persisted run and appears in Mission Control.
         """
         # Fail fast (before writing anything) if there's no way to run the evaluation, so we
         # never fabricate an all-errored 0% baseline. Only relevant when no client is injected.
@@ -484,19 +482,12 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
                 feature_name=body.feature_name,
                 feature_type=body.feature_type,
             )
-            # Stage the bundle in a throwaway dir, then install it into the platform root;
-            # install refuses to overwrite, so an already-activated name surfaces as a 400.
-            with tempfile.TemporaryDirectory(prefix="mrds_onboard_") as staging:
-                paths = write_feature_bundle(
-                    spec,
-                    cases=body.cases,
-                    system_prompt=body.system_prompt,
-                    root=staging,
-                )
-                installed = activate_bundle(paths.bundle_dir, root=platform_root)
-            result = run_first_evaluation(
-                installed,
-                root=platform_root,
+            # DB-native activation: persist the bundle and evaluate it without touching the
+            # filesystem. A duplicate name surfaces as an ActivationError -> 400.
+            result = activate_feature_from_store(
+                spec,
+                cases=body.cases,
+                system_prompt=body.system_prompt,
                 store=session.store,
                 client=client,
                 triggered_by="onboarding",
@@ -505,16 +496,6 @@ def _register_routes(app: FastAPI) -> None:  # noqa: C901 - a flat list of thin 
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        except OSError as exc:
-            # The platform root is not writable (e.g. a read-only serverless filesystem).
-            # Surface a clear JSON error instead of an opaque plain-text 500.
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    f"Cannot persist the feature bundle: storage at '{platform_root}' is not "
-                    f"writable ({exc}). Configure MRDS_PLATFORM_ROOT to a writable directory."
-                ),
-            ) from exc
 
         # First run for the feature — nothing to regress against — so promote directly
         # through the store (no BaselinePromoter eligibility gate applies to a first baseline).

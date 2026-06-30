@@ -21,12 +21,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
+from mrds.datasets.models import DatasetDefinition
+from mrds.datasets.validation import validate_dataset_data
 from mrds.features.spec import FeatureSpec, build_input_model, build_output_model
 from mrds.onboarding.errors import OnboardingError
+from mrds.prompts.models import PromptDefinition
 
 _DEFAULT_DIFFICULTY = "medium"
 
@@ -58,8 +62,8 @@ def _feature_yaml(spec: FeatureSpec) -> str:
     return yaml.safe_dump(spec.model_dump(mode="json"), sort_keys=False)
 
 
-def _prompt_yaml(spec: FeatureSpec, system_prompt: str) -> str:
-    data = {
+def _prompt_dict(spec: FeatureSpec, system_prompt: str) -> dict:
+    return {
         "version": "v1",
         "created_at": date.today().isoformat(),
         "description": spec.title or f"Prompt for {spec.feature_name}.",
@@ -67,11 +71,14 @@ def _prompt_yaml(spec: FeatureSpec, system_prompt: str) -> str:
         "system_prompt": system_prompt,
         "few_shot_examples": [],
     }
-    return yaml.safe_dump(data, sort_keys=False)
 
 
-def _dataset_json(spec: FeatureSpec, cases: Sequence[dict]) -> str:
-    data = {
+def _prompt_yaml(spec: FeatureSpec, system_prompt: str) -> str:
+    return yaml.safe_dump(_prompt_dict(spec, system_prompt), sort_keys=False)
+
+
+def _dataset_dict(spec: FeatureSpec, cases: Sequence[dict]) -> dict:
+    return {
         "version": "v1",
         "created_at": date.today().isoformat(),
         "description": spec.title or f"Golden dataset for {spec.feature_name}.",
@@ -86,7 +93,38 @@ def _dataset_json(spec: FeatureSpec, cases: Sequence[dict]) -> str:
             for case in cases
         ],
     }
-    return json.dumps(data, indent=2)
+
+
+def _dataset_json(spec: FeatureSpec, cases: Sequence[dict]) -> str:
+    return json.dumps(_dataset_dict(spec, cases), indent=2)
+
+
+def build_prompt_definition(spec: FeatureSpec, system_prompt: str) -> PromptDefinition:
+    """Build and validate the v1 prompt definition for a feature — no file I/O.
+
+    The in-memory counterpart to the prompt file ``write_feature_bundle`` would emit,
+    for persisting a prompt straight into the database (DB-native activation).
+    """
+    if not system_prompt.strip():
+        raise OnboardingError("system_prompt must not be blank")
+    return PromptDefinition.model_validate(_prompt_dict(spec, system_prompt))
+
+
+def build_dataset_definition(
+    spec: FeatureSpec, cases: Sequence[dict]
+) -> DatasetDefinition[Any, Any]:
+    """Build and validate the v1 dataset definition for a feature — no file I/O.
+
+    Cases are validated against the feature's generated models, exactly as the dataset
+    file would be on load. The in-memory counterpart of the dataset file emitted by
+    ``write_feature_bundle``.
+    """
+    _validate_cases(spec, cases)
+    return validate_dataset_data(
+        _dataset_dict(spec, cases),
+        input_model=build_input_model(spec),
+        output_model=build_output_model(spec),
+    )
 
 
 def write_feature_bundle(
