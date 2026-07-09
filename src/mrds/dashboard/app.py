@@ -72,8 +72,9 @@ else:
     st.divider()
     st.write("Open a page from the sidebar: **Runs**, **Trends**, **Regressions**, **Baselines**.")
 
-# Cross-link into the onboarding wizard (the create-a-feature surface).
+# Cross-link into the create-a-feature surface (the Next.js "Evaluation OS" web app).
 st.divider()
 st.caption(
-    "➕ **Onboard a new feature** — run the wizard: `streamlit run src/mrds/onboarding/app.py`"
+    "➕ **Onboard a new feature** — use the web app's *Create feature* flow "
+    "(`web/app/create` → `POST /api/onboarding/activate`)."
 )

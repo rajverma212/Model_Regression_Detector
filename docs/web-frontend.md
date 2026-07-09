@@ -59,25 +59,20 @@ now surfaced in the UI as an explicit "promote anyway".
 
 **Activation is the create flow's last mile.** `POST /api/onboarding/activate` stitches the
 existing onboarding/activation/evaluation cores together without adding any evaluation or
-persistence logic: it re-infers the spec from the labeled cases, `write_feature_bundle`,
-`activate_bundle` (install + register), `run_first_evaluation` (unchanged engine → store),
-then `promote_baseline` for the initial baseline. It returns `{feature, run_id, baseline_id,
-summary}`; because step 4 persists a run, the feature appears in Mission Control immediately
-(the fleet lists features with ≥1 recorded run). Two injectable seams keep it production-correct
-and offline-testable: `get_platform_root` (the writable `settings.platform_root`, where bundles
-install and the engine reads them — must equal the process working directory) and `get_llm_client`
-(the real Anthropic client in production; a deterministic stub in tests).
+persistence logic: it re-infers the spec from the labeled cases, then `activate_feature_from_store`
+persists the spec/prompt/dataset to the database, rebuilds the registries *from the store*, runs
+the first evaluation through the unchanged engine, and persists the run — then `promote_baseline`
+for the initial baseline. It is **filesystem-free**: the database is the system of record, so it
+works on a read-only platform root and the feature resolves in any later process (CLI, CI, a cold
+serverless instance). It returns `{feature, run_id, baseline_id, summary}`; because a run is
+persisted, the feature appears in Mission Control immediately (the fleet lists features with ≥1
+recorded run). `get_llm_client` is the one injectable seam — the real Anthropic client in
+production, a deterministic stub in tests.
 
-It also **fails closed and honestly** (no fabricated baselines, no opaque 500s):
-- no `ANTHROPIC_API_KEY` configured → `422` *before* anything is written (the first evaluation
-  can't run, so no all-errored 0% baseline is created);
-- a non-writable `platform_root` (e.g. a read-only serverless filesystem) → `503` with a clear
-  JSON message naming the unwritable path, never a plain-text `Internal Server Error`.
-
-Activation needs `ANTHROPIC_API_KEY` and a writable `platform_root`; it is durable locally / on
-any persistent host. On the read-only serverless deployment the entrypoint redirects the platform
-root to a writable `/tmp` working dir (see `docs/deploy-vercel.md`), so it works **within a warm
-instance** but is ephemeral (writes reset on a cold start).
+It also **fails closed and honestly** (no fabricated baselines): with no `ANTHROPIC_API_KEY`
+configured it returns `422` *before* anything is written, so no all-errored 0% baseline is
+created. Activation needs `ANTHROPIC_API_KEY`; it is durable locally / on any persistent host,
+and demo-grade (ephemeral) on the `/tmp`-database serverless deploy (see `docs/deploy-vercel.md`).
 
 Run it with `python -m mrds.api` (or the `mrds-api` script). Covered by
 `tests/unit/test_api.py` (TestClient over a seeded temp DB; the model is never called).

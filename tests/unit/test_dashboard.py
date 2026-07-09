@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 
 import pytest
@@ -17,7 +16,6 @@ from mrds.dashboard.data import (
     explain_case,
     filter_cases,
     humanize_metric_name,
-    load_dataset_view,
     parse_dataset,
     perfect_run_recommendations,
 )
@@ -519,24 +517,6 @@ def test_parse_dataset_keeps_notes_and_input_text() -> None:
     assert first.expected["category"] == "billing"
     assert first.difficulty == "easy"
     assert first.notes == "clear billing case"
-
-
-def test_load_dataset_view_picks_latest_version(tmp_path) -> None:
-    feature_dir = tmp_path / "email_classifier"
-    feature_dir.mkdir()
-    (feature_dir / "v1.json").write_text(
-        json.dumps({"version": "v1", "description": "old", "cases": []}), encoding="utf-8"
-    )
-    (feature_dir / "v2.json").write_text(
-        json.dumps({"version": "v2", "description": "new", "cases": []}), encoding="utf-8"
-    )
-    view = load_dataset_view("email_classifier", datasets_dir=tmp_path)
-    assert view is not None
-    assert view.version == "v2"  # highest version wins
-
-
-def test_load_dataset_view_missing_returns_none(tmp_path) -> None:
-    assert load_dataset_view("nope", datasets_dir=tmp_path) is None
 
 
 # -- metric name humanizing -----------------------------------------------------

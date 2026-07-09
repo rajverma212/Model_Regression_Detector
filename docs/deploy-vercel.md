@@ -12,14 +12,15 @@ The frontend reaches the backend through one environment variable, `MRDS_API_URL
 (set on the `mrds-web` project to the backend URL).
 
 > **How Vercel runs it (one caveat):** Vercel is serverless with a filesystem that is
-> **read-only except `/tmp`**. On cold start the backend assembles a single **writable working
-> root** under `/tmp` (a copy of `config/`, `prompts/`, `datasets/`, `specs/` and the seeded
-> `eval.db`) and points the platform at it. So everything works *within a warm instance* —
-> including **end-to-end feature activation** (Create → Activate → first evaluation → baseline →
-> Mission Control) and in-UI baseline promotion — but anything written online (new features,
-> promotions, runs) is **ephemeral**: `/tmp` is per-instance and resets on a cold start. Run
-> locally (or on any persistent host) for durable onboarding. The first visit after idle may
-> take a few seconds to wake (cold start).
+> **read-only except `/tmp`**. Since feature bundles live in the database (the DB-only cutover),
+> the only writable state the backend needs is the SQLite file: on cold start it copies the
+> committed, pre-seeded `data/seed.db` — which already carries the built-in features' bundle
+> content — to `/tmp/eval.db` and points `MRDS_DATABASE_PATH` at it. So everything works *within
+> a warm instance* — including **end-to-end feature activation** (Create → Activate → first
+> evaluation → baseline → Mission Control) and in-UI baseline promotion — but anything written
+> online (new features, promotions, runs) is **ephemeral**: `/tmp` is per-instance and resets on
+> a cold start. Run locally (or on any persistent host) for durable onboarding. The first visit
+> after idle may take a few seconds to wake (cold start).
 >
 > Activating a feature online also requires `ANTHROPIC_API_KEY` set on the `mrds-api` project
 > (the first evaluation calls the model). Without it, activation returns a clear `422` rather
@@ -68,12 +69,11 @@ Two projects share one repo, so the build config has to keep them apart. Three t
    before it builds (empty ~9 ms build → 404). `.gitignore` already keeps `.venv` and
    `node_modules` out of Git clones, so no `.vercelignore` is needed.
 
-How `api/index.py` works on Vercel: it adds repo-root `src/` to `sys.path`; on cold start it
-copies the bundled read-only assets (`config/`, `prompts/`, `datasets/`, `specs/`) and the seeded
-`data/seed.db` into a writable working root at `/tmp/mrds`, `chdir`s there, and sets
-`MRDS_PLATFORM_ROOT` + `MRDS_DATABASE_PATH` to it — giving the platform one consistent, writable
-root for both reads and activation writes — then serves the unchanged `mrds.api.app:app`.
-(`includeFiles` in the repo-root `vercel.json` must bundle those asset dirs so they exist to copy.)
+How `api/index.py` works on Vercel: it adds repo-root `src/` to `sys.path`, `chdir`s to the
+repo root (so read-only `config/settings.yaml` resolves), copies the seeded `data/seed.db` →
+`/tmp/eval.db` (the only writable state the DB-native platform needs) on cold start, points
+`MRDS_DATABASE_PATH` at it, and serves the unchanged `mrds.api.app:app`. (`includeFiles` in the
+repo-root `vercel.json` bundles `config/` and `data/seed.db`.)
 
 ## Reproducing it from scratch
 

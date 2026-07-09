@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -62,11 +61,6 @@ def get_session() -> Iterator[ApiSession]:
         yield session
     finally:
         session.close()
-
-
-def get_platform_root() -> Path:
-    """FastAPI dependency: the writable root where activated bundles are installed."""
-    return Path(get_settings().platform_root)
 
 
 def get_llm_client() -> StructuredLLMClient | None:

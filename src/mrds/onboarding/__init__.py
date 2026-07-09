@@ -9,13 +9,13 @@ wiring, no global feature discovery.
 from mrds.onboarding.errors import OnboardingError
 from mrds.onboarding.inference import FeatureFamily, infer_feature_spec
 from mrds.onboarding.scaffold import scaffold_prompt
-from mrds.onboarding.writer import BundlePaths, write_feature_bundle
+from mrds.onboarding.writer import build_dataset_definition, build_prompt_definition
 
 __all__ = [
-    "BundlePaths",
     "FeatureFamily",
     "OnboardingError",
+    "build_dataset_definition",
+    "build_prompt_definition",
     "infer_feature_spec",
     "scaffold_prompt",
-    "write_feature_bundle",
 ]

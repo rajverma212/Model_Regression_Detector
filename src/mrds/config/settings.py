@@ -58,13 +58,6 @@ class Settings(BaseSettings):
     # Local SQLite database file (used by the ``sqlite`` backend).
     database_path: Path = Path("data/eval.db")
 
-    # --- Platform root: the writable directory holding specs/, prompts/, datasets/.
-    # Feature activation installs new bundles here and the engine reads them back, so
-    # it must be writable and equal to the process working directory. Defaults to the
-    # current directory (durable locally / on any persistent host); a read-only
-    # serverless filesystem must point this at a writable location.
-    platform_root: Path = Path(".")
-
     # --- Model defaults --------------------------------------------------------
     model: str = "claude-haiku-4-5"
     judge_enabled: bool = False

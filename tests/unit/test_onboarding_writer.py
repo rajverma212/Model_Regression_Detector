@@ -1,20 +1,16 @@
-"""Tests for the feature-bundle writer."""
+"""Tests for the in-memory feature-bundle builders (DB-native activation)."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from mrds.datasets.registry import DatasetRegistry
-from mrds.features.spec import build_input_model, build_output_model, load_feature_spec
 from mrds.onboarding import (
     OnboardingError,
+    build_dataset_definition,
+    build_prompt_definition,
     infer_feature_spec,
     scaffold_prompt,
-    write_feature_bundle,
 )
-from mrds.prompts.registry import PromptRegistry
 
 _RAW = {
     "cases": [
@@ -42,49 +38,30 @@ def _spec_and_prompt():
     return spec, scaffold_prompt(spec, feature_type="classification")
 
 
-def test_bundle_is_written_and_loadable(tmp_path: Path) -> None:
+def test_prompt_and_dataset_definitions_are_built_and_valid() -> None:
     spec, prompt = _spec_and_prompt()
-    paths = write_feature_bundle(spec, cases=_RAW["cases"], system_prompt=prompt, root=tmp_path)
 
-    assert paths.feature_yaml.exists()
-    assert paths.prompt_yaml.exists()
-    assert paths.dataset_json.exists()
+    prompt_def = build_prompt_definition(spec, prompt)
+    assert prompt_def.version == "v1"
+    assert prompt_def.system_prompt.strip()
 
-    # feature.yaml round-trips through the generation layer.
-    loaded = load_feature_spec(paths.feature_yaml)
-    assert loaded.feature_name == "support_cls"
-    assert [f.name for f in loaded.output_fields] == ["category"]
-
-    # Prompt + dataset load through the existing registries.
-    prompts = PromptRegistry.from_directory(paths.bundle_dir / "prompts")
-    assert prompts.get_latest("support_cls").definition.system_prompt.strip()
-
-    datasets = DatasetRegistry.from_directory(
-        paths.bundle_dir / "datasets",
-        model_resolver=lambda _f: (build_input_model(loaded), build_output_model(loaded)),
-    )
-    assert datasets.get_latest("support_cls").definition.case_count == 3
+    dataset_def = build_dataset_definition(spec, _RAW["cases"])
+    assert dataset_def.version == "v1"
+    assert dataset_def.case_count == 3
+    # Cases are typed against the feature's generated models (kept as validated cases).
+    assert [c.id for c in dataset_def.cases] == ["c1", "c2", "c3"]
 
 
-def test_refuses_to_overwrite_existing_bundle(tmp_path: Path) -> None:
-    spec, prompt = _spec_and_prompt()
-    write_feature_bundle(spec, cases=_RAW["cases"], system_prompt=prompt, root=tmp_path)
-    with pytest.raises(OnboardingError, match="already exists"):
-        write_feature_bundle(spec, cases=_RAW["cases"], system_prompt=prompt, root=tmp_path)
-
-
-def test_blank_prompt_rejected(tmp_path: Path) -> None:
+def test_blank_prompt_rejected() -> None:
     spec, _ = _spec_and_prompt()
     with pytest.raises(OnboardingError, match="must not be blank"):
-        write_feature_bundle(spec, cases=_RAW["cases"], system_prompt="   ", root=tmp_path)
-    assert not (tmp_path / "support_cls").exists()
+        build_prompt_definition(spec, "   ")
 
 
-def test_case_outside_schema_rejected_and_nothing_written(tmp_path: Path) -> None:
-    spec, prompt = _spec_and_prompt()
+def test_case_outside_schema_rejected() -> None:
+    spec, _ = _spec_and_prompt()
     bad_cases = [
         {"id": "x", "input": {"text": "hi"}, "expected_output": {"category": "not_a_real_label"}},
     ]
     with pytest.raises(OnboardingError, match="does not match the schema"):
-        write_feature_bundle(spec, cases=bad_cases, system_prompt=prompt, root=tmp_path)
-    assert not (tmp_path / "support_cls").exists()
+        build_dataset_definition(spec, bad_cases)

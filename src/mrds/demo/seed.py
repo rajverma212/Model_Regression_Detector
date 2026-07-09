@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from mrds.activation.bootstrap import ensure_builtin_bundles
 from mrds.core.registry import FeatureRegistry
 from mrds.datasets.loader import DEFAULT_DATASETS_DIR
 from mrds.datasets.registry import DatasetRegistry
@@ -56,6 +57,10 @@ def seed_demo(
     if store.runs.features():
         logger.info("Demo seed skipped: database already contains runs.")
         return SeedResult(seeded=False)
+
+    # Seed the built-in features' bundle content into the DB first (the system of record),
+    # so the dashboard/API resolve datasets and prompts from the store, not the filesystem.
+    ensure_builtin_bundles(store, prompts_dir=prompts_dir, datasets_dir=datasets_dir)
 
     prompts = PromptRegistry.from_directory(prompts_dir)
     # Default (registry-based) resolver so each feature's dataset resolves to its own

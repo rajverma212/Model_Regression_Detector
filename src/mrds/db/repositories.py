@@ -92,7 +92,12 @@ class PromptVersionRepository:
     ) -> PromptVersionRecord:
         self._conn.execute(
             "INSERT INTO prompt_versions(feature_name, version, content_hash, path, content, "
-            "created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(content_hash) DO NOTHING",
+            "created_at) VALUES (?, ?, ?, ?, ?, ?) "
+            # Identity (content_hash) is immutable, but backfill the content/path blob when a
+            # later caller supplies it for a row first recorded (by save_evaluation) with none.
+            "ON CONFLICT(content_hash) DO UPDATE SET content=excluded.content, path=excluded.path "
+            "WHERE excluded.content <> '' "
+            "AND (prompt_versions.content = '' OR prompt_versions.content IS NULL)",
             (feature_name, version, content_hash, path, content, created_at or _utcnow_iso()),
         )
         record = self.get_by_hash(content_hash)
@@ -139,7 +144,11 @@ class DatasetVersionRepository:
         self._conn.execute(
             "INSERT INTO dataset_versions(feature_name, version, content_hash, path, "
             "case_count, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(content_hash) DO NOTHING",
+            # Identity (content_hash) is immutable, but backfill the content/path blob when a
+            # later caller supplies it for a row first recorded (by save_evaluation) with none.
+            "ON CONFLICT(content_hash) DO UPDATE SET content=excluded.content, path=excluded.path "
+            "WHERE excluded.content <> '' "
+            "AND (dataset_versions.content = '' OR dataset_versions.content IS NULL)",
             (
                 feature_name,
                 version,

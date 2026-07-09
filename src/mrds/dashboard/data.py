@@ -12,9 +12,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 
-from mrds.datasets.loader import DEFAULT_DATASETS_DIR
 from mrds.db import EvaluationStore
 from mrds.db.records import BaselineRecord, RegressionRecord, RunRecord
 from mrds.evaluation.models import AggregateMetrics, CaseResult, EvaluationResult
@@ -334,36 +332,9 @@ def parse_dataset(raw: dict[str, object], *, feature: str) -> DatasetView:
     )
 
 
-def _dataset_version_number(stem: str) -> int:
-    """Numeric component of a ``vN`` filename stem, or -1 if it doesn't match."""
-    return int(stem[1:]) if stem.startswith("v") and stem[1:].isdigit() else -1
-
-
-def _latest_dataset_file(feature: str, datasets_dir: Path) -> Path | None:
-    """The highest-version ``vN.json`` file for a feature, if any."""
-    feature_dir = Path(datasets_dir) / feature
-    if not feature_dir.is_dir():
-        return None
-    files = sorted(feature_dir.glob("*.json"), key=lambda p: _dataset_version_number(p.stem))
-    return files[-1] if files else None
-
-
-def load_dataset_view(
-    feature: str, *, datasets_dir: Path = DEFAULT_DATASETS_DIR
-) -> DatasetView | None:
-    """Load the latest golden dataset for a feature from disk, or ``None`` if absent.
-
-    Reads the versioned JSON directly (outside the SQLite path) so the richest data —
-    the dataset ``description`` and per-case ``notes`` — is available to the explorer.
-    """
-    path = _latest_dataset_file(feature, datasets_dir)
-    if path is None:
-        return None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return parse_dataset(raw, feature=feature)
+def _dataset_version_number(version: str) -> int:
+    """Numeric component of a ``vN`` version label, or -1 if it doesn't match."""
+    return int(version[1:]) if version.startswith("v") and version[1:].isdigit() else -1
 
 
 @dataclass(frozen=True)
@@ -524,11 +495,19 @@ class DashboardData:
         """``run_uuid -> RunLabel`` for a feature's runs (for lookup by uuid)."""
         return {label.run_uuid: label for label in self.run_labels(feature, limit=limit)}
 
-    def dataset_view(
-        self, feature: str, *, datasets_dir: Path = DEFAULT_DATASETS_DIR
-    ) -> DatasetView | None:
-        """The latest golden dataset for a feature (read from disk), or ``None``."""
-        return load_dataset_view(feature, datasets_dir=datasets_dir)
+    def dataset_view(self, feature: str) -> DatasetView | None:
+        """The latest golden dataset for a feature, read from the database (or ``None``).
+
+        The database is the system of record: this reads the highest-version
+        ``dataset_versions`` row's persisted content, so both built-in and onboarded
+        features resolve the same way, in any process.
+        """
+        rows = [r for r in self._store.dataset_versions.all() if r.feature_name == feature]
+        rows = [r for r in rows if r.content]
+        if not rows:
+            return None
+        latest = max(rows, key=lambda r: _dataset_version_number(r.version))
+        return parse_dataset(json.loads(latest.content), feature=feature)
 
     def segment_field_for(self, feature: str) -> str | None:
         """The segment field (e.g. ``category``) used by the feature's latest run."""

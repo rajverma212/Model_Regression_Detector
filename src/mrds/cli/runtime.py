@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mrds.activation.bootstrap import bootstrap_platform
+from mrds.activation.discovery import load_datasets_from_store, load_prompts_from_store
 from mrds.db import EvaluationStore, get_backend
 from mrds.evaluation import EvaluationEngine
 from mrds.observability.logging import get_logger
@@ -30,15 +32,21 @@ class CliRuntime:
 
 
 def build_runtime() -> CliRuntime:
-    """Construct the production runtime from real registries and the database."""
-    # Importing the features package registers all built-in features so the
-    # engine and dataset registry can resolve them by name.
-    import mrds.features  # noqa: F401
+    """Construct the production runtime from the database (the system of record).
 
+    Registers every feature (built-in + DB-activated) and seeds built-in bundle content,
+    then builds the engine from **store-backed** prompt/dataset registries — the filesystem
+    is no longer a runtime resolution path.
+    """
     database = get_backend().connect()
+    store = EvaluationStore(database)
+    bootstrap_platform(store)
     runtime = CliRuntime(
-        store=EvaluationStore(database),
-        engine=EvaluationEngine(),
+        store=store,
+        engine=EvaluationEngine(
+            prompts=load_prompts_from_store(store),
+            datasets=load_datasets_from_store(store),
+        ),
         detector=RegressionDetector(),
         reporter=ReportBuilder(),
     )
