@@ -30,6 +30,13 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
+    # Installed in dev so the libSQL backend's parity tests actually run.
+    "libsql>=0.1",
+]
+# libSQL / Turso storage backend (second engine behind the storage abstraction).
+# Local dev defaults to SQLite; select with MRDS_STORAGE_BACKEND=libsql.
+libsql = [
+    "libsql>=0.1",
 ]
 # Streamlit dashboard (presentation only). The dashboard's data-access layer has
 # no Streamlit dependency, so the test suite does not require this extra.

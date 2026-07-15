@@ -35,7 +35,16 @@ def create_backend(settings: Settings | None = None) -> StorageBackend:
     name = settings.storage_backend
     if name == "sqlite":
         return SqliteBackend(settings.database_path)
-    raise DbError(f"unknown storage backend {name!r} (supported: 'sqlite')")
+    if name == "libsql":
+        # Imported lazily so a SQLite-only install never needs the libsql package.
+        from mrds.db.backends.libsql import LibsqlBackend
+
+        return LibsqlBackend(
+            settings.database_path,
+            sync_url=settings.libsql_sync_url,
+            auth_token=settings.libsql_auth_token,
+        )
+    raise DbError(f"unknown storage backend {name!r} (supported: 'sqlite', 'libsql')")
 
 
 def get_backend() -> StorageBackend:

@@ -54,9 +54,17 @@ class Settings(BaseSettings):
     # Which storage backend serves as EvalOS's system of record. Selected here and
     # built by ``mrds.db.create_backend``; the rest of the system depends only on
     # the backend interface, so changing engines is configuration, not code.
-    storage_backend: Literal["sqlite"] = "sqlite"
-    # Local SQLite database file (used by the ``sqlite`` backend).
+    storage_backend: Literal["sqlite", "libsql"] = "sqlite"
+    # Local database file (the ``sqlite`` backend, and the ``libsql`` backend's local file
+    # or Turso embedded-replica path).
     database_path: Path = Path("data/eval.db")
+
+    # --- libSQL / Turso (used when storage_backend == "libsql") ----------------
+    # When a sync URL is set, the libsql backend runs as a Turso embedded replica synced
+    # from the remote primary (durable, multi-instance); otherwise it is a local libSQL
+    # file at database_path. Canonical Turso env names, no MRDS_ prefix.
+    libsql_sync_url: str | None = Field(default=None, validation_alias="TURSO_DATABASE_URL")
+    libsql_auth_token: str | None = Field(default=None, validation_alias="TURSO_AUTH_TOKEN")
 
     # --- Model defaults --------------------------------------------------------
     model: str = "claude-haiku-4-5"

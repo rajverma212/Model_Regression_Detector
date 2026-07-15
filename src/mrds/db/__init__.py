@@ -6,7 +6,13 @@ API; it integrates with the existing evaluation/regression models without changi
 their public contracts.
 """
 
-from mrds.db.backends import SqliteBackend, StorageBackend, create_backend, get_backend
+from mrds.db.backends import (
+    LibsqlBackend,
+    SqliteBackend,
+    StorageBackend,
+    create_backend,
+    get_backend,
+)
 from mrds.db.connection import Database, open_database
 from mrds.db.errors import DbError
 from mrds.db.records import (
@@ -30,6 +36,7 @@ __all__ = [
     "PromptVersionRecord",
     "RegressionRecord",
     "RunRecord",
+    "LibsqlBackend",
     "SqliteBackend",
     "StorageBackend",
     "TestResultRecord",
