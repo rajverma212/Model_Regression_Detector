@@ -11,16 +11,26 @@ auto-redeploying on every `git push` to `main`:
 The frontend reaches the backend through one environment variable, `MRDS_API_URL`
 (set on the `mrds-web` project to the backend URL).
 
-> **How Vercel runs it (one caveat):** Vercel is serverless with a filesystem that is
-> **read-only except `/tmp`**. Since feature bundles live in the database (the DB-only cutover),
-> the only writable state the backend needs is the SQLite file: on cold start it copies the
-> committed, pre-seeded `data/seed.db` — which already carries the built-in features' bundle
-> content — to `/tmp/eval.db` and points `MRDS_DATABASE_PATH` at it. So everything works *within
-> a warm instance* — including **end-to-end feature activation** (Create → Activate → first
-> evaluation → baseline → Mission Control) and in-UI baseline promotion — but anything written
-> online (new features, promotions, runs) is **ephemeral**: `/tmp` is per-instance and resets on
-> a cold start. Run locally (or on any persistent host) for durable onboarding. The first visit
-> after idle may take a few seconds to wake (cold start).
+> **How Vercel runs it:** Vercel is serverless with a filesystem that is **read-only except
+> `/tmp`**. Since feature bundles live in the database (the DB-only cutover), the only state
+> the backend needs is its database. The entrypoint picks one of two modes from env:
+>
+> - **Durable (Turso)** — set `MRDS_STORAGE_BACKEND=libsql`, `TURSO_DATABASE_URL`, and
+>   `TURSO_AUTH_TOKEN` on the `mrds-api` project. Requests run against a Turso **embedded
+>   replica** (reads local, writes to the remote primary), so activated features, runs, and
+>   baseline promotions **survive cold starts and are shared across instances**. On first
+>   deploy an empty primary is auto-seeded with the built-in features + demo narrative
+>   (idempotent). This is the production mode for online onboarding.
+> - **Demo fallback (no Turso env)** — copy the committed, pre-seeded `data/seed.db` to
+>   `/tmp/eval.db` and use SQLite. Everything works *within a warm instance* — including
+>   end-to-end activation — but writes are **ephemeral** (reset on a cold start).
+>
+> The first visit after idle may take a few seconds to wake (cold start).
+>
+> **Turso setup (once):** `turso db create mrds-eval` → `turso db show mrds-eval --url` gives
+> `TURSO_DATABASE_URL` (`libsql://…`); `turso db tokens create mrds-eval` gives
+> `TURSO_AUTH_TOKEN`. Add both plus `MRDS_STORAGE_BACKEND=libsql` to the `mrds-api` Vercel
+> project env and redeploy; the schema and seed content are created automatically.
 >
 > Activating a feature online also requires `ANTHROPIC_API_KEY` set on the `mrds-api` project
 > (the first evaluation calls the model). Without it, activation returns a clear `422` rather

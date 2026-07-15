@@ -88,6 +88,47 @@ def test_activate_feature_from_store_is_filesystem_free(tmp_path) -> None:
         )
 
 
+def test_activate_succeeds_on_a_seeded_store() -> None:
+    """Regression test (store-side twin of the shared-directory discovery bug): a store
+    already holding *another* feature's dataset content — a different schema, as on the
+    seeded production DB — must not break a new activation."""
+    import json
+
+    store = EvaluationStore(open_database(":memory:"))
+    store.dataset_versions.upsert(
+        feature_name="email_like",
+        version="v1",
+        content_hash="foreign-hash",
+        case_count=1,
+        content=json.dumps(
+            {
+                "version": "v1",
+                "created_at": "2026-01-01",
+                "description": "A foreign feature with a different schema.",
+                "cases": [
+                    {
+                        "id": "e1",
+                        "input": {"email_text": "I was charged twice."},
+                        "expected_output": {"category": "billing", "summary": "Double charge."},
+                        "expected_difficulty": "easy",
+                        "notes": "",
+                    }
+                ],
+            }
+        ),
+    )
+
+    result = activate_feature_from_store(
+        _spec("new_feat"),
+        cases=_RAW["cases"],
+        system_prompt="Classify the message into one category. Respond as JSON.",
+        store=store,
+        client=_Stub(),
+    )
+    assert result.aggregate_metrics.total_cases == 4
+    assert "new_feat" in DashboardData(store).features()
+
+
 def test_full_create_activate_evaluate_view() -> None:
     store = EvaluationStore(open_database(":memory:"))
 

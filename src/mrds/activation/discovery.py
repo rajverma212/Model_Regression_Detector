@@ -75,7 +75,10 @@ def load_prompts_from_store(store: EvaluationStore) -> PromptRegistry:
 
 
 def load_datasets_from_store(
-    store: EvaluationStore, *, model_resolver: ModelResolver | None = None
+    store: EvaluationStore,
+    *,
+    model_resolver: ModelResolver | None = None,
+    feature: str | None = None,
 ) -> DatasetRegistry:
     """Build a :class:`DatasetRegistry` from dataset versions persisted in the database.
 
@@ -83,6 +86,11 @@ def load_datasets_from_store(
     against the feature's models (resolved via ``model_resolver``, defaulting to the
     global feature registry), so the relevant features must be registered first. Rows
     without persisted content are skipped — their cases still live on the filesystem.
+
+    ``feature`` scopes loading to one feature's rows. **Required** whenever the resolver
+    only knows a single feature's models (e.g. first-evaluation activation): without it,
+    every other feature's persisted dataset would be validated against the wrong schema —
+    the store-side twin of the shared-directory discovery bug.
     """
     from mrds.datasets.loader import load_dataset_from_definition_json
     from mrds.datasets.registry import DatasetRegistry, _default_model_resolver
@@ -90,7 +98,7 @@ def load_datasets_from_store(
     resolve = model_resolver or _default_model_resolver
     registry = DatasetRegistry(model_resolver=resolve)
     for rec in store.dataset_versions.all():
-        if not rec.content:
+        if not rec.content or (feature is not None and rec.feature_name != feature):
             continue
         input_model, output_model = resolve(rec.feature_name)
         registry.register(

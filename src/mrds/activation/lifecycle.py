@@ -79,8 +79,13 @@ def activate_feature_from_store(
     # the first evaluation through the unchanged engine — never touching the filesystem.
     prompts = load_prompts_from_store(store)
     feature = build_from_spec(spec, client=client, prompt_registry=prompts)
+    # Scope to *this* feature's rows: the resolver only knows this feature's models, so
+    # loading other features' persisted datasets would validate them against the wrong
+    # schema (the store-side twin of the old shared-directory discovery bug).
     datasets = load_datasets_from_store(
-        store, model_resolver=lambda _f: (feature.input_model, feature.output_model)
+        store,
+        model_resolver=lambda _f: (feature.input_model, feature.output_model),
+        feature=spec.feature_name,
     )
     registry = FeatureRegistry()
     registry.register(feature)
