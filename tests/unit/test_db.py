@@ -151,6 +151,24 @@ def test_bootstrap_is_idempotent() -> None:
     assert db.bootstrap() == SCHEMA_VERSION  # second call is a no-op and returns the version
 
 
+def test_bootstrap_records_version_in_meta_table() -> None:
+    """The schema version is tracked portably in schema_meta (remote engines reject
+    PRAGMA user_version writes), with the pragma kept as a native marker."""
+    db = open_database(":memory:")
+    row = db.connection.execute(
+        "SELECT value FROM schema_meta WHERE key='schema_version'"
+    ).fetchone()
+    assert row is not None and int(row[0]) == SCHEMA_VERSION
+
+
+def test_bootstrap_falls_back_to_pragma_version() -> None:
+    """A database stamped only via PRAGMA (created before schema_meta existed) must not
+    be treated as fresh — its pragma version is read and upgrade steps are skipped."""
+    db = open_database(":memory:")
+    db.connection.execute("DROP TABLE schema_meta")  # simulate a pre-meta-table database
+    assert db.bootstrap() == SCHEMA_VERSION  # read from PRAGMA user_version, no re-run
+
+
 def test_open_database_creates_file(tmp_path) -> None:
     path = tmp_path / "nested" / "eval.db"
     db = open_database(path)

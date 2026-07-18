@@ -1,9 +1,13 @@
 """Schema bootstrap and migration tracking.
 
-Migrations are tracked with SQLite's ``PRAGMA user_version``. ``schema.sql`` is the
-**full latest shape** of the database: a fresh database is created directly from it,
-and because every statement uses ``IF NOT EXISTS`` it also creates any brand-new
-*tables* on an existing database.
+The schema version is tracked portably in the ``schema_meta`` table (authoritative),
+with ``PRAGMA user_version`` kept as a best-effort native marker and read fallback:
+remote SQLite protocols (Turso/Hrana) reject pragma *writes*, and databases created
+before ``schema_meta`` existed carry their version only in the pragma.
+
+``schema.sql`` is the **full latest shape** of the database: a fresh database is
+created directly from it, and because every statement uses ``IF NOT EXISTS`` it also
+creates any brand-new *tables* on an existing database.
 
 What ``schema.sql`` cannot do on an existing database is alter an *existing* table
 (e.g. add a column). Those changes are expressed as ordered, incremental steps in
@@ -40,9 +44,46 @@ def _schema_sql() -> str:
     return files("mrds.db").joinpath("schema.sql").read_text(encoding="utf-8")
 
 
+def _read_version(conn: sqlite3.Connection) -> int:
+    """The database's current schema version.
+
+    The portable ``schema_meta`` table is authoritative; ``PRAGMA user_version`` is the
+    fallback so databases stamped only natively (created before the table existed)
+    still report their true version and don't re-run upgrade steps as if fresh.
+    """
+    try:
+        row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
+        if row is not None:
+            return int(row[0])
+    except Exception:  # noqa: BLE001 - table absent; engines differ on the error type raised
+        pass
+    return int(conn.execute("PRAGMA user_version").fetchone()[0])
+
+
+def _write_version(conn: sqlite3.Connection, version: int) -> None:
+    """Record the schema version portably (table) plus best-effort natively (PRAGMA).
+
+    Remote SQLite protocols (Turso/Hrana) reject ``PRAGMA user_version = N`` writes
+    ("SQL not allowed statement"), so the pragma is advisory only — the ``schema_meta``
+    row is what :func:`_read_version` trusts first.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO schema_meta(key, value) VALUES ('schema_version', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (str(version),),
+    )
+    try:
+        conn.execute(f"PRAGMA user_version = {version}")
+    except Exception:  # noqa: BLE001 - pragma writes disallowed over Hrana; the table wins
+        logger.debug("PRAGMA user_version write unsupported by this engine; using schema_meta")
+
+
 def bootstrap(conn: sqlite3.Connection) -> int:
     """Create/upgrade the schema if needed; return the resulting schema version."""
-    current = conn.execute("PRAGMA user_version").fetchone()[0]
+    current = _read_version(conn)
     if current >= SCHEMA_VERSION:
         return current
 
@@ -55,6 +96,6 @@ def bootstrap(conn: sqlite3.Connection) -> int:
         for version, statement in _MIGRATIONS:
             if current < version:
                 conn.executescript(statement)
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    _write_version(conn, SCHEMA_VERSION)
     conn.commit()
     return SCHEMA_VERSION
